@@ -1,0 +1,7 @@
+{
+  "name": "Car Service Guru website",
+  "description": "Modern car service booking platform with Supabase backend and WhatsApp integration.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
