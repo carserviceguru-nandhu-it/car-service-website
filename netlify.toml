@@ -7,9 +7,8 @@
   to = "/index.html"
   status = 200
 
-# Optional: Add Proxy for API once Vercel is deployed
-# [[redirects]]
-#   from = "/api/*"
-#   to = "https://your-backend-on-vercel.vercel.app/api/:splat"
-#   status = 200
-#   force = true
+[[redirects]]
+  from = "/api/*"
+  to = "https://car-service-website-psi.vercel.app/api/:splat"
+  status = 200
+  force = true
