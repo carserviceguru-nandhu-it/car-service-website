@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Phone, Mail, User, Loader2, ArrowRight } from 'lucide-react';
+import { Phone, Mail, User, Loader2, ArrowRight, Shield, X, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LoginProps {
@@ -17,6 +17,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [showRoleModal, setShowRoleModal] = useState<{show: boolean, role: string}>({show: false, role: ''});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +38,12 @@ export default function Login({ onLogin }: LoginProps) {
       }
 
       const userData = result.user;
+
+      if (userData.role === 'admin' || userData.role === 'garage') {
+        setShowRoleModal({ show: true, role: userData.role });
+        return;
+      }
+
       onLogin(userData);
       
       // 3. Redirect based on history
@@ -148,6 +155,53 @@ export default function Login({ onLogin }: LoginProps) {
           By continuing, you agree to our <span className="underline cursor-pointer">Terms of Service</span> and <span className="underline cursor-pointer">Privacy Policy</span>.
         </p>
       </motion.div>
+
+      {/* Role Restriction Modal */}
+      {showRoleModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-indigo-600" />
+            
+            <button 
+              onClick={() => {
+                setShowRoleModal({ show: false, role: '' });
+                navigate('/');
+              }}
+              className="absolute top-4 right-4 p-2 hover:bg-stone-100 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-stone-500" />
+            </button>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Shield className="w-10 h-10 text-blue-600" />
+              </div>
+              
+              <h2 className="text-2xl font-black mb-2 uppercase tracking-tight">
+                {showRoleModal.role} Account
+              </h2>
+              <p className="text-stone-600 font-medium mb-8 leading-relaxed">
+                This is a <span className="text-blue-600 font-bold">{showRoleModal.role} account</span>. 
+                Please go and visit your site to manage your dashboard.
+              </p>
+
+              <button 
+                onClick={() => {
+                  setShowRoleModal({ show: false, role: '' });
+                  navigate('/');
+                }}
+                className="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-95 shadow-lg shadow-stone-200"
+              >
+                Close & Go Home
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
