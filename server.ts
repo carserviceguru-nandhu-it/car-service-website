@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 
@@ -28,6 +29,58 @@ const getSupabase = () => {
   }
   
   return createClient(supabaseUrl, supabaseServiceKey);
+};
+
+const sendBookingNotification = async (details: any) => {
+  const { customerName, phone, email, carBrand, carModel, bookingTime, totalPrice, location } = details;
+  
+  // Ensure we have a password before trying
+  if (!process.env.EMAIL_APP_PASSWORD) {
+    console.warn("Skipping email notification: EMAIL_APP_PASSWORD is not set in environment variables.");
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'carserviceguru@gmail.com',
+      pass: process.env.EMAIL_APP_PASSWORD
+    }
+  });
+
+  const mailOptions = {
+    from: '"Car Service Guru" <carserviceguru@gmail.com>',
+    to: 'carserviceguru@gmail.com',
+    subject: `🚗 New Booking Alert: ${customerName}`,
+    text: `
+      🚀 New Booking Received!
+      
+      Customer Details:
+      ----------------
+      Name: ${customerName}
+      Phone: ${phone}
+      Email: ${email || 'N/A'}
+      
+      Vehicle Details:
+      ---------------
+      Car: ${carBrand} ${carModel}
+      
+      Service Details:
+      ---------------
+      Total Price: ₹${totalPrice}
+      Date/Time: ${bookingTime}
+      Location: ${location || 'Not provided'}
+      
+      Please log in to the admin dashboard to manage this booking.
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("Booking notification sent to owner email!");
+  } catch (error) {
+    console.error("Error sending notification email:", error);
+  }
 };
 
 // Health check
@@ -389,6 +442,19 @@ app.post("/api/bookings", async (req, res) => {
     }
 
     console.log("Booking saved successfully:", savedBooking?.id);
+    
+    // Trigger owner notification
+    sendBookingNotification({
+      customerName, 
+      phone, 
+      email, 
+      carBrand, 
+      carModel, 
+      bookingTime, 
+      totalPrice, 
+      location
+    }).catch(err => console.error("Notification trigger failed:", err));
+
     console.log("--- END BOOKING PROCESS (SUCCESS) ---");
     res.json({ success: true, booking: savedBooking });
   } catch (error: any) {
