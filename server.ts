@@ -83,6 +83,33 @@ const sendBookingNotification = async (details: any) => {
   }
 };
 
+const sendWhatsAppNotification = async (details: any) => {
+  const { customerName, phone, carBrand, carModel, totalPrice } = details;
+  const apiKey = process.env.WHATSAPP_API_KEY;
+  const myPhone = "+919751969009";
+
+  if (!apiKey) {
+    console.warn("Skipping WhatsApp notification: WHATSAPP_API_KEY is not set.");
+    return;
+  }
+
+  // Format message for URL (spaces replaced by %20 or +, newlines by %0A)
+  const messageText = `🚗 *New Booking Received!*%0A%0A*Customer:* ${customerName}%0A*Phone:* ${phone}%0A*Vehicle:* ${carBrand} ${carModel}%0A*Total Price:* ₹${totalPrice}%0A%0A_Check your admin panel for full details._`;
+
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${myPhone}&text=${messageText}&apikey=${apiKey}`;
+
+  try {
+    const response = await fetch(url);
+    if (response.ok) {
+      console.log("WhatsApp notification sent successfully!");
+    } else {
+      console.error("WhatsApp API returned an error:", await response.text());
+    }
+  } catch (error) {
+    console.error("Error sending WhatsApp notification:", error);
+  }
+};
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", env: { 
@@ -454,6 +481,15 @@ app.post("/api/bookings", async (req, res) => {
       totalPrice, 
       location
     }).catch(err => console.error("Notification trigger failed:", err));
+
+    // Trigger WhatsApp notification
+    sendWhatsAppNotification({
+      customerName,
+      phone,
+      carBrand,
+      carModel,
+      totalPrice
+    }).catch(err => console.error("WhatsApp trigger failed:", err));
 
     console.log("--- END BOOKING PROCESS (SUCCESS) ---");
     res.json({ success: true, booking: savedBooking });
