@@ -19,6 +19,18 @@ export default function Login({ onLogin }: LoginProps) {
   const navigate = useNavigate();
   const [showRoleModal, setShowRoleModal] = useState<{show: boolean, role: string}>({show: false, role: ''});
 
+  React.useEffect(() => {
+    // If an admin/garage is already in localStorage (maybe bypassed App.tsx check), show the modal
+    const savedUser = localStorage.getItem('csg_user');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      const role = user.role?.toLowerCase();
+      if (role === 'admin' || role === 'garage') {
+        setShowRoleModal({ show: true, role });
+      }
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -38,9 +50,10 @@ export default function Login({ onLogin }: LoginProps) {
       }
 
       const userData = result.user;
+      const userRole = userData.role?.toLowerCase();
 
-      if (userData.role === 'admin' || userData.role === 'garage') {
-        setShowRoleModal({ show: true, role: userData.role });
+      if (userRole === 'admin' || userRole === 'garage') {
+        setShowRoleModal({ show: true, role: userRole });
         return;
       }
 

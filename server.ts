@@ -8,32 +8,32 @@ import nodemailer from "nodemailer";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
 const getSupabase = () => {
   const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  
+
   if (!supabaseUrl) {
     throw new Error("Supabase URL is missing. Please add VITE_SUPABASE_URL to Secrets.");
   }
   if (!supabaseServiceKey) {
     throw new Error("Supabase Service Role Key is missing. Please add SUPABASE_SERVICE_ROLE_KEY to Secrets.");
   }
-  
+
   // Basic validation of key format
   if (!supabaseServiceKey.startsWith('eyJ')) {
     throw new Error("The SUPABASE_SERVICE_ROLE_KEY looks incorrect. It should be a long string starting with 'eyJ'. Please make sure you copied the 'service_role' key.");
   }
-  
+
   return createClient(supabaseUrl, supabaseServiceKey);
 };
 
 const sendBookingNotification = async (details: any) => {
   const { customerName, phone, email, carBrand, carModel, bookingTime, totalPrice, location } = details;
-  
+
   // Ensure we have a password before trying
   if (!process.env.EMAIL_APP_PASSWORD) {
     console.warn("Skipping email notification: EMAIL_APP_PASSWORD is not set in environment variables.");
@@ -110,25 +110,64 @@ const sendWhatsAppNotification = async (details: any) => {
   }
 };
 
+const sendSMSNotification = async (details: any) => {
+  const { customerName, phone, carBrand, carModel, totalPrice } = details;
+  const apiKey = process.env.FAST2SMS_API_KEY;
+  const myPhone = "9751969009";
+
+  if (!apiKey) {
+    console.warn("Skipping SMS notification: FAST2SMS_API_KEY is not set.");
+    return;
+  }
+
+  try {
+    const response = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+      method: 'POST',
+      headers: {
+        "authorization": apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "route": "q",
+        "message": `New Booking Alert!\nCustomer: ${customerName}\nPhone: ${phone}\nCar: ${carBrand} ${carModel}\nPrice: ₹${totalPrice}`,
+        "language": "english",
+        "flash": 0,
+        "numbers": myPhone
+      })
+    });
+
+    const result = await response.json();
+    if (result.return) {
+      console.log("SMS notification sent successfully via Fast2SMS!");
+    } else {
+      console.error("Fast2SMS API error:", result.message);
+    }
+  } catch (error) {
+    console.error("Error sending SMS notification:", error);
+  }
+};
+
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", env: { 
-    hasUrl: !!process.env.VITE_SUPABASE_URL,
-    hasAnon: !!process.env.VITE_SUPABASE_ANON_KEY,
-    hasService: !!process.env.SUPABASE_SERVICE_ROLE_KEY 
-  }});
+  res.json({
+    status: "ok", env: {
+      hasUrl: !!process.env.VITE_SUPABASE_URL,
+      hasAnon: !!process.env.VITE_SUPABASE_ANON_KEY,
+      hasService: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    }
+  });
 });
 
 const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: string, phone: string, email?: string }) => {
   console.log(`getOrCreateUser: ${name}, ${phone}, ${email}`);
-  
+
   // 1. Check if profile exists
   let { data: existingProfile, error: profileError } = await supabase
     .from("profiles")
     .select("*")
     .eq("phone", phone)
     .single();
-  
+
   if (existingProfile) {
     console.log("Found existing profile:", existingProfile.id);
     if (!existingProfile.role) {
@@ -164,14 +203,14 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
   }
 
   const authEmail = email || `${digitsOnly}@carserviceguru.com`;
-  
+
   console.log(`Attempting to create Auth User with email: ${authEmail}, phone: ${formattedPhone}`);
-  
+
   // First, try to fetch users to see if they exist before creating
   const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
   if (!listError) {
-    const existingAuthUser = users.find((u: any) => 
-      u.phone === formattedPhone || 
+    const existingAuthUser = users.find((u: any) =>
+      u.phone === formattedPhone ||
       u.phone === phone ||
       (u.email && authEmail && u.email.toLowerCase() === authEmail.toLowerCase())
     );
@@ -202,7 +241,7 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
           email_confirm: true,
           user_metadata: { name, phone }
         });
-        
+
         if (!fallbackError && fallbackAuth?.user) {
           authId = fallbackAuth.user.id;
           console.log("Created fallback Auth user ID without phone:", authId);
@@ -227,9 +266,9 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
   console.log(`Creating profile with authId: ${authId}`);
   const { data: newProfile, error: createError } = await supabase
     .from("profiles")
-    .insert([{ 
+    .insert([{
       id: authId,
-      name, 
+      name,
       phone, // Keep the original phone requested
       email,
       role: 'customer'
@@ -258,7 +297,7 @@ app.get("/api/services", async (req, res) => {
       .from("services")
       .select("*")
       .order("name", { ascending: true });
-    
+
     if (error) throw error;
     res.json({ success: true, services: data });
   } catch (error: any) {
@@ -272,17 +311,17 @@ app.post("/api/bookings", async (req, res) => {
     const supabase = getSupabase();
     const { customerName, phone, email, carBrand, carModel, services, location, bookingTime, userId, totalPrice } = req.body;
 
-    console.log("Incoming booking request payload:", { 
-      customerName, 
-      phone, 
-      email, 
-      carBrand, 
-      carModel, 
-      servicesCount: services?.length, 
-      location, 
-      bookingTime, 
-      userId, 
-      totalPrice 
+    console.log("Incoming booking request payload:", {
+      customerName,
+      phone,
+      email,
+      carBrand,
+      carModel,
+      servicesCount: services?.length,
+      location,
+      bookingTime,
+      userId,
+      totalPrice
     });
 
     if (!phone) {
@@ -291,12 +330,12 @@ app.post("/api/bookings", async (req, res) => {
     }
 
     // 1. Ensure user exists in profiles or create
-    const userProfile = await getOrCreateUser(supabase, { 
-      name: customerName, 
-      phone, 
-      email 
+    const userProfile = await getOrCreateUser(supabase, {
+      name: customerName,
+      phone,
+      email
     });
-    
+
     const currentUserId = userProfile.id;
     console.log("User profile determined:", currentUserId);
 
@@ -323,12 +362,12 @@ app.post("/api/bookings", async (req, res) => {
           .from("vehicles")
           .select("id, brand, model")
           .eq("user_id", currentUserId);
-        
-        const existingVehicle = vehicles?.find((v: any) => 
-          v.brand.toLowerCase() === carBrand.toLowerCase() && 
+
+        const existingVehicle = vehicles?.find((v: any) =>
+          v.brand.toLowerCase() === carBrand.toLowerCase() &&
           v.model.toLowerCase() === carModel.toLowerCase()
         );
-        
+
         if (existingVehicle) {
           vehicleId = existingVehicle.id;
           console.log("Found existing vehicle:", vehicleId);
@@ -336,14 +375,14 @@ app.post("/api/bookings", async (req, res) => {
           console.log("Creating new vehicle record...");
           const { data: newVehicle, error: vError } = await supabase
             .from("vehicles")
-            .insert([{ 
-              user_id: currentUserId, 
-              brand: carBrand, 
-              model: carModel 
+            .insert([{
+              user_id: currentUserId,
+              brand: carBrand,
+              model: carModel
             }])
             .select()
             .single();
-          
+
           if (!vError && newVehicle) {
             vehicleId = newVehicle.id;
             console.log("New vehicle created:", vehicleId);
@@ -362,7 +401,7 @@ app.post("/api/bookings", async (req, res) => {
     }
 
     console.log("Preparing booking payload for user:", currentUserId);
-    
+
     const tryBookingInsert = async (payload: any) => {
       console.log("Attempting insert with payload:", JSON.stringify(payload));
       return await supabase.from("bookings").insert([payload]).select();
@@ -398,18 +437,18 @@ app.post("/api/bookings", async (req, res) => {
 
     if (bookingError && (bookingError.code === '42703' || bookingError.message.includes("column"))) {
       console.log("Primary insert failed due to column mismatch, entering recovery mode...");
-      
+
       // Recovery mode: Try to find which columns exist by doing a minimal select
       try {
         const { data: sample } = await supabase.from("bookings").select("*").limit(1);
         if (sample && sample.length > 0) {
           const keys = Object.keys(sample[0]);
           console.log("Available columns in bookings table:", keys);
-          
+
           const findKey = (possibilities: string[]) => possibilities.find(p => keys.includes(p));
-          
+
           const recoveryPayload: any = { status: "pending" };
-          
+
           const tCol = findKey(timeCols);
           const pCol = findKey(priceCols);
           const bCol = findKey(brandCols);
@@ -417,7 +456,7 @@ app.post("/api/bookings", async (req, res) => {
           const uCol = findKey(userCols);
           const lCol = findKey(locationCols);
           const sCol = findKey(servicesCols);
-          
+
           if (tCol) recoveryPayload[tCol] = bookingTime;
           if (pCol) recoveryPayload[pCol] = totalPrice || 0;
           if (bCol) recoveryPayload[bCol] = carBrand;
@@ -445,7 +484,7 @@ app.post("/api/bookings", async (req, res) => {
     }
 
     const savedBooking = bookingData?.[0];
-    
+
     // 1.9 Insert into booking_services table
     if (savedBooking && services && Array.isArray(services)) {
       try {
@@ -453,11 +492,11 @@ app.post("/api/bookings", async (req, res) => {
           booking_id: savedBooking.id,
           service_id: sId
         }));
-        
+
         const { error: sError } = await supabase
           .from("booking_services")
           .insert(serviceInserts);
-          
+
         if (sError) {
           console.warn("Failed to insert into booking_services, table might not exist yet:", sError.message);
         } else {
@@ -469,16 +508,16 @@ app.post("/api/bookings", async (req, res) => {
     }
 
     console.log("Booking saved successfully:", savedBooking?.id);
-    
+
     // Trigger owner notification
     sendBookingNotification({
-      customerName, 
-      phone, 
-      email, 
-      carBrand, 
-      carModel, 
-      bookingTime, 
-      totalPrice, 
+      customerName,
+      phone,
+      email,
+      carBrand,
+      carModel,
+      bookingTime,
+      totalPrice,
       location
     }).catch(err => console.error("Notification trigger failed:", err));
 
@@ -491,13 +530,22 @@ app.post("/api/bookings", async (req, res) => {
       totalPrice
     }).catch(err => console.error("WhatsApp trigger failed:", err));
 
+    // Trigger SMS notification
+    sendSMSNotification({
+      customerName,
+      phone,
+      carBrand,
+      carModel,
+      totalPrice
+    }).catch(err => console.error("SMS trigger failed:", err));
+
     console.log("--- END BOOKING PROCESS (SUCCESS) ---");
     res.json({ success: true, booking: savedBooking });
   } catch (error: any) {
     console.error("CRITICAL BOOKING ERROR:", error);
     console.log("--- END BOOKING PROCESS (FAILURE) ---");
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error.message,
       details: error.details || "No additional details"
     });
@@ -564,7 +612,7 @@ app.post("/api/bookings/:id/cancel", async (req, res) => {
 
     if (fetchError) throw fetchError;
     if (!booking) return res.status(404).json({ success: false, error: "Booking not found" });
-    
+
     // Check ownership
     if (booking.user_id !== userId) {
       return res.status(403).json({ success: false, error: "Unauthorized" });
@@ -629,7 +677,7 @@ app.get("/api/user-history/:phone", async (req, res) => {
       .single();
 
     if (userError && userError.code !== "PGRST116") throw userError;
-    
+
     // Normalize bookings if they exist
     if (user && user.bookings) {
       user.bookings = user.bookings.map((b: any) => {
@@ -639,7 +687,7 @@ app.get("/api/user-history/:phone", async (req, res) => {
         return { ...b, booking_time: dateVal, total_price: priceVal };
       });
     }
-    
+
     res.json({ success: true, user });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
