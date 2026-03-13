@@ -58,7 +58,9 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               
               <div className="flex items-center gap-3 pl-4 ml-2 border-l border-stone-200">
                 <div className="flex flex-col items-end">
-                  <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest leading-none mb-1">Customer</span>
+                  <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest leading-none mb-1">
+                    {user.role || 'Customer'}
+                  </span>
                   <span className="text-sm font-black text-stone-900 leading-none">{user.name}</span>
                 </div>
                 <button 

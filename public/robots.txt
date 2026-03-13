@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://carserviceguru.netlify.app/sitemap.xml

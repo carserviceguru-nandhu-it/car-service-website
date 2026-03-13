@@ -17,7 +17,14 @@ export default function App() {
   useEffect(() => {
     const savedUser = localStorage.getItem('csg_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      // Security: If an admin or garage is somehow still logged in, log them out
+      if (parsedUser.role === 'admin' || parsedUser.role === 'garage') {
+        localStorage.removeItem('csg_user');
+        setUser(null);
+      } else {
+        setUser(parsedUser);
+      }
     }
   }, []);
 
