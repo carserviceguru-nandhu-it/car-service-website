@@ -79,7 +79,17 @@ export default function Home() {
         const response = await fetch('/api/services');
         const data = await response.json();
         if (data.success) {
-          setServices(data.services.slice(0, 4)); // Show top 4
+          // Find our main 4 services by name, or fallback to first 4
+          const targetNames = ["Basic Services", "Standard Service", "Comprehensive Services", "Battery Jumpstart"];
+          const filtered = data.services.filter((s: any) => targetNames.includes(s.name));
+          
+          if (filtered.length >= 4) {
+            // Sort by targetNames order
+            filtered.sort((a: any, b: any) => targetNames.indexOf(a.name) - targetNames.indexOf(b.name));
+            setServices(filtered.slice(0, 4));
+          } else {
+            setServices(data.services.slice(0, 4));
+          }
         }
       } catch (error) {
         console.error('Error fetching services:', error);
@@ -193,9 +203,9 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-black mb-4">Popular Services</h2>
             <p className="text-stone-500 font-medium">Top-rated maintenance services for your vehicle.</p>
           </div>
-          <Link to="/services" className="text-blue-600 font-bold flex items-center gap-2 hover:translate-x-1 transition-transform">
+          <Link to="/services" className="text-blue-600 font-bold flex items-center gap-2 hover:translate-x-1 transition-transform group">
             View All Services
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
 
@@ -205,29 +215,97 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((service, idx) => (
-              <motion.div
-                key={service.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="bg-white p-6 rounded-3xl border border-stone-200 hover:border-blue-500/30 hover:shadow-xl transition-all group relative overflow-hidden"
-              >
-                {service.label && (
-                  <div className="absolute top-4 right-4 bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">
-                    {service.label}
+            {services.map((service, idx) => {
+              const styles = [
+                { gradient: 'from-blue-500/10 to-transparent', borderColor: 'group-hover:border-blue-500', shadow: 'hover:shadow-blue-500/20', iconColor: 'text-blue-500', originalPrice: Math.round(service.price * 1.5) },
+                { gradient: 'from-purple-500/10 to-transparent', borderColor: 'group-hover:border-purple-500', shadow: 'hover:shadow-purple-500/20', iconColor: 'text-purple-500', originalPrice: Math.round(service.price * 1.4) },
+                { gradient: 'from-emerald-500/10 to-transparent', borderColor: 'group-hover:border-emerald-500', shadow: 'hover:shadow-emerald-500/20', iconColor: 'text-emerald-500', originalPrice: Math.round(service.price * 1.3) },
+                { gradient: 'from-orange-500/10 to-transparent', borderColor: 'group-hover:border-orange-500', shadow: 'hover:shadow-orange-500/20', iconColor: 'text-orange-500', originalPrice: null }
+              ];
+              const style = styles[idx % styles.length];
+              
+              const IconComponent = (iconMap[service.icon] as React.ReactElement) || <Wrench />;
+              const styledIcon = React.cloneElement(IconComponent, { className: `w-8 h-8 ${style.iconColor}` });
+
+              return (
+                <motion.div
+                  key={service.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.1, duration: 0.5 }}
+                  className={`bg-white rounded-3xl border border-stone-200 p-1 group relative overflow-hidden transition-all duration-300 ${style.shadow} ${style.borderColor}`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-b ${style.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
+                  
+                  <div className="bg-white rounded-[20px] p-6 h-full relative z-10 flex flex-col">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="w-14 h-14 rounded-2xl bg-stone-50 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 shadow-sm border border-stone-100">
+                        {styledIcon}
+                      </div>
+                      {service.label && (
+                        <div className="bg-stone-900 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
+                          {service.label}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 className="text-xl font-black text-stone-800 mb-2 group-hover:text-stone-900 transition-colors">{service.name}</h3>
+                    
+                    <div className="mt-auto pt-4 flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-blue-600">₹{service.price}</span>
+                      {style.originalPrice && (
+                        <span className="text-sm font-bold text-stone-400 line-through">₹{style.originalPrice}</span>
+                      )}
+                    </div>
                   </div>
-                )}
-                <div className="w-12 h-12 rounded-xl bg-stone-100 text-stone-500 flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  {iconMap[service.icon] || <Wrench className="w-6 h-6" />}
-                </div>
-                <h3 className="text-lg font-bold mb-2">{service.name}</h3>
-                <p className="text-blue-600 font-black">₹{service.price}</p>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
+
+        {/* Contact info below popular services */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-16 bg-gradient-to-r from-stone-900 to-stone-800 rounded-3xl p-8 md:p-12 relative overflow-hidden shadow-2xl border border-stone-800"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-600/20 blur-[80px] rounded-full -translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-white/10 text-stone-300 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 border border-white/5 backdrop-blur-sm">
+                <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" /> Need Assistance?
+              </div>
+              <h3 className="text-3xl md:text-4xl font-black text-white mb-3">For more services contact</h3>
+              <p className="text-stone-400 font-medium text-lg max-w-xl">
+                Our auto experts are available to guide you and provide the most accurate estimates for your vehicle's specific needs.
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto shrink-0">
+              <a 
+                href="tel:+919751969009" 
+                className="flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:shadow-[0_0_30px_rgba(37,99,235,0.6)] active:scale-95 group"
+              >
+                <div className="bg-white/20 p-2 rounded-full group-hover:animate-bounce">
+                  <Phone className="w-5 h-5" />
+                </div>
+                Call +91 9751969009
+              </a>
+              <a 
+                href="mailto:carserviceguru@gmail.com"
+                className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 text-white border border-white/10 backdrop-blur-md px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 active:scale-95 group"
+              >
+                <Mail className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                carserviceguru@gmail.com
+              </a>
+            </div>
+          </div>
+        </motion.div>
       </section>
 
       {/* Guarantee Section */}
