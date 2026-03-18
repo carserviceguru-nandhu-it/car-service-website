@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   ShieldCheck, 
@@ -69,9 +69,65 @@ const features = [
   }
 ];
 
+const serviceFeatures: Record<string, string[]> = {
+  "Basic Services": [
+    "Oil Replacement",
+    "Oil filter replacement",
+    "Air Filter Cleaning",
+    "Coolant Top up",
+    "Wiper Fluid Replacement",
+    "Washing"
+  ],
+  "Standard Service": [
+    "Oil Replacement",
+    "Oil filter replacement",
+    "Air Filter Replacement",
+    "Coolant Top up",
+    "Wiper Fluid Replacement",
+    "Washing",
+    "Break oil Topup",
+    "AC Filter Cleaning",
+    "Front & Rear Brake Cleaning",
+    "Engine Scanning"
+  ],
+  "Comprehensive Services": [
+    "Oil Replacement",
+    "Oil filter replacement",
+    "Air Filter Replacement",
+    "Ac Filter Replacement",
+    "Wiper Fluid Replacement",
+    "Washing",
+    "Break oil Topup",
+    "Coolant Top up",
+    "Front & Rear Brake Cleaning",
+    "Engine Scanning",
+    "Engine Flushing",
+    "Throttle Body Cleaning",
+    "Gear Oil",
+    "Wheel Alignment"
+  ],
+  "Battery Jumpstart": [
+    "Inspection Rs.500"
+  ]
+};
+
 export default function Home() {
   const [services, setServices] = useState<any[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
+  const navigate = useNavigate();
+
+  const handleServiceClick = (serviceId: string) => {
+    const saved = localStorage.getItem('csg_selected_services');
+    let selected: string[] = [];
+    if (saved) {
+      try { selected = JSON.parse(saved); } catch(e){}
+    }
+    if (!selected.includes(serviceId)) {
+      selected.push(serviceId);
+    }
+    localStorage.setItem('csg_selected_services', JSON.stringify(selected));
+    navigate('/services'); 
+  };
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -226,6 +282,7 @@ export default function Home() {
               
               const IconComponent = (iconMap[service.icon] as React.ReactElement) || <Wrench />;
               const styledIcon = React.cloneElement(IconComponent, { className: `w-8 h-8 ${style.iconColor}` });
+              const featuresList = serviceFeatures[service.name] || [];
 
               return (
                 <motion.div
@@ -234,7 +291,8 @@ export default function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1, duration: 0.5 }}
-                  className={`bg-white rounded-3xl border border-stone-200 p-1 group relative overflow-hidden transition-all duration-300 ${style.shadow} ${style.borderColor}`}
+                  onClick={() => handleServiceClick(service.id)}
+                  className={`bg-white rounded-3xl border border-stone-200 p-1 group relative overflow-hidden transition-all duration-300 cursor-pointer ${style.shadow} ${style.borderColor}`}
                 >
                   <div className={`absolute inset-0 bg-gradient-to-b ${style.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
                   
@@ -252,12 +310,23 @@ export default function Home() {
                     
                     <h3 className="text-xl font-black text-stone-800 mb-2 group-hover:text-stone-900 transition-colors">{service.name}</h3>
                     
-                    <div className="mt-auto pt-4 flex items-baseline gap-2">
+                    <div className="pt-2 pb-4 flex items-baseline gap-2 mb-2">
                       <span className="text-3xl font-black text-blue-600">₹{service.price}</span>
                       {style.originalPrice && (
                         <span className="text-sm font-bold text-stone-400 line-through">₹{style.originalPrice}</span>
                       )}
                     </div>
+
+                    {featuresList.length > 0 && (
+                      <ul className="mt-auto pt-4 border-t border-stone-100 space-y-2.5 text-xs text-stone-600 font-medium">
+                        {featuresList.map((feature, i) => (
+                          <li key={i} className="flex items-start gap-2.5">
+                            <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${style.iconColor.replace('text-', 'bg-')}`}></div>
+                            <span className="leading-snug">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </motion.div>
               );
