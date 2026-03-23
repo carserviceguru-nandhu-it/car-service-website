@@ -256,114 +256,237 @@ export default function Dashboard({ user }: DashboardProps) {
   const downloadPDF = (booking: any) => {
     const doc = new jsPDF();
     const primaryColor = [37, 99, 235]; // blue-600
-    const secondaryColor = [100, 100, 100];
-    const bgColor = [249, 250, 251]; // gray-50
+    const accentColor = [30, 41, 59]; // slate-800
     
-    // Background
-    doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-    doc.rect(0, 0, 210, 297, 'F');
+    // Header Section
+    doc.setFillColor( accentColor[0], accentColor[1], accentColor[2]);
+    doc.rect(0, 0, 210, 40, 'F');
     
-    // Card
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(15, 15, 180, 267, 5, 5, 'F');
-    
-    // Header
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(22);
+    // Logo Text (as we don't have the image easily)
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
-    doc.text('Car Service Guru', 25, 35);
-    
-    // Status Badge
-    const status = (booking.display_status || booking.status || 'pending').toUpperCase();
-    doc.setFillColor(245, 245, 220); // light amber
-    doc.roundedRect(150, 25, 35, 10, 2, 2, 'F');
-    doc.setTextColor(180, 130, 0);
-    doc.setFontSize(10);
-    doc.text(status, 167.5, 31.5, { align: 'center' });
-    
-    doc.setDrawColor(230, 230, 230);
-    doc.line(25, 45, 185, 45);
-    
-    // Title
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(16);
-    doc.text('Service Invoice / Confirmation', 25, 58);
-    
-    // Booking Details Box
-    doc.setFillColor(252, 252, 255);
-    doc.roundedRect(25, 68, 160, 65, 3, 3, 'F');
-    
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text('Booking Details', 35, 78);
+    doc.text('CAR SERVICE GURU', 25, 22);
     
     doc.setFontSize(10);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text('Booking ID:', 35, 90);
-    doc.text('Date & Time:', 35, 100);
-    doc.text('Vehicle:', 35, 110);
-    doc.text('Location:', 35, 120);
+    doc.setFont('helvetica', 'normal');
+    doc.text('EXPERT CARE • SMART AI', 25, 30);
     
-    doc.setTextColor(0, 0, 0);
-    doc.text(`#${(booking.id || 'N/A').toString().slice(0, 8).toUpperCase()}`, 75, 90);
-    doc.text(new Date(booking.booking_time).toLocaleString(), 75, 100);
-    doc.text(`${booking.car_brand} ${booking.car_model}`, 75, 110);
-    
-    const splitLocation = doc.splitTextToSize(booking.location || 'Not specified', 100);
-    doc.text(splitLocation, 75, 120);
-    
-    // Selected Services Box
-    doc.setFillColor(252, 252, 255);
-    doc.roundedRect(25, 140, 160, 60, 3, 3, 'F');
-    
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text('Selected Services', 35, 150);
-    
-    let yPos = 162;
-    doc.setFontSize(10);
-    const services = Array.isArray(booking.services) ? booking.services : [];
-    if (services.length === 0) {
-      doc.setTextColor(150, 150, 150);
-      doc.setFont('helvetica', 'italic');
-      doc.text('No services specified', 35, yPos);
-    } else {
-      services.forEach((service: any) => {
-        const sName = typeof service === 'object' ? service.name : service;
-        const sPrice = typeof service === 'object' ? service.price : 0;
-        
-        doc.setTextColor(0, 0, 0);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`• ${(sName || '').toString().replace('-', ' ')}`, 35, yPos);
-        
-        if (sPrice > 0) {
-          doc.text(`INR ${sPrice}`, 150, yPos);
-        }
-        
-        yPos += 8;
-      });
-    }
-    
-    // Total Amount Box
-    doc.setFillColor(240, 246, 255);
-    doc.roundedRect(25, 210, 160, 20, 3, 3, 'F');
-    
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('Total Amount', 35, 222.5);
+    doc.text('JOB CARD', 150, 25);
     
+    // Main Content
+    let yPos = 55;
+    
+    // Section Header: Customer & Vehicle Details
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFontSize(14);
-    doc.text(`INR ${booking.total_price || 0}`, 150, 222.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Customer & Vehicle Details', 15, yPos);
     
-    // Footer
-    doc.setFontSize(10);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    yPos += 8;
+    
+    // Table Draw Helper
+    const drawTableRow = (rowY: number, label1: string, val1: any, label2: string, val2: any) => {
+      doc.setDrawColor(210, 210, 210);
+      doc.setFillColor(255, 255, 255);
+      
+      // Cells
+      doc.rect(15, rowY, 40, 10);
+      doc.rect(55, rowY, 50, 10);
+      doc.rect(105, rowY, 40, 10);
+      doc.rect(145, rowY, 50, 10);
+      
+      // Content
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label1, 18, rowY + 6.5);
+      doc.text(label2, 108, rowY + 6.5);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(val1 || 'N/A'), 58, rowY + 6.5);
+      doc.text(String(val2 || 'N/A'), 148, rowY + 6.5);
+    };
+
+    drawTableRow(yPos, 'Customer Name', booking.profiles?.name || 'N/A', 'Mobile Number', booking.profiles?.phone || 'N/A');
+    yPos += 10;
+    drawTableRow(yPos, 'Vehicle Brand', booking.car_brand, 'Vehicle Model', booking.car_model);
+    yPos += 10;
+    drawTableRow(yPos, 'Registration No', booking.registration_no || '', 'Odometer Rd', booking.odometer_reading || '0');
+    yPos += 10;
+    drawTableRow(yPos, 'Fuel Status', booking.fuel_status || 'N/A', 'Booking ID', (booking.id || '').toString().slice(0, 8).toUpperCase());
+    yPos += 10;
+    drawTableRow(yPos, 'Battery Details', booking.battery_details || 'Amaron', 'Fuel Type', booking.fuel_type || 'Petrol');
+    yPos += 10;
+    drawTableRow(yPos, 'Supervisor', booking.supervisor || 'Nandhu', 'Car Variant', booking.car_variant || 'N/A');
+    
+    yPos += 25;
+    
+    // Section Header: Garage Booking Details
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Garage Booking Details', 15, yPos);
+    
+    yPos += 8;
+    
+    // Mini Info Cards
+    const drawMiniCard = (x: number, y: number, label: string, value: string, iconColor: number[]) => {
+      doc.setFillColor(252, 252, 255);
+      doc.roundedRect(x, y, 60, 25, 3, 3, 'F');
+      doc.setDrawColor(240, 240, 250);
+      doc.roundedRect(x, y, 60, 25, 3, 3, 'S');
+      
+      doc.setFillColor(iconColor[0], iconColor[1], iconColor[2]);
+      doc.rect(x + 5, y + 5, 10, 5, 'F'); // Dummy Icon Shape
+      
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(label.toUpperCase(), x + 5, y + 15);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.text(value, x + 5, y + 21);
+    };
+    
+    const bDate = booking.scheduled_date || new Date(booking.booking_time).toLocaleDateString();
+    const bTime = booking.scheduled_time || new Date(booking.booking_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    drawMiniCard(15, yPos, 'Workshop', booking.workshop_name || 'Car Service Guru', [200, 150, 80]);
+    drawMiniCard(78, yPos, 'Walkin Date', bDate, [220, 50, 50]);
+    drawMiniCard(141, yPos, 'Walkin Time', bTime, [100, 100, 250]);
+    
+    yPos += 45;
+    
+    // Section Header: Inventory
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Inventory', 15, yPos);
+    
+    yPos += 8;
+    
+    // Inventory Checklist
+    const items = [
+      { key: 'perfume', label: 'PERFUME' },
+      { key: 'jack_set', label: 'JACK SET' },
+      { key: 'tool_kit', label: 'TOOL KIT' },
+      { key: 'spare_wheel', label: 'SPARE WHEEL' },
+      { key: 'head_rest', label: 'HEAD REST' },
+      { key: 'floor_mats', label: 'FLOOR MATS' },
+      { key: 'wheel_cap', label: 'WHEEL CAP' },
+      { key: 'mud_flap', label: 'MUD FLAP' }
+    ];
+    
+    const cellWidth = 22;
+    doc.setDrawColor(220, 230, 250);
+    
+    items.forEach((item, i) => {
+      const x = 15 + (i * cellWidth);
+      doc.setFillColor(248, 250, 255);
+      doc.rect(x, yPos, cellWidth, 10, 'F');
+      doc.rect(x, yPos, cellWidth, 10, 'S');
+      
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 0);
+      doc.text(item.label, x + (cellWidth/2), yPos + 6.5, { align: 'center' });
+      
+      // Value cell
+      const valueY = yPos + 10;
+      doc.setFillColor(255, 255, 255);
+      doc.rect(x, valueY, cellWidth, 15, 'F');
+      doc.rect(x, valueY, cellWidth, 15, 'S');
+      
+      const isChecked = booking[item.key] === true || booking[item.key] === 'Checked' || booking[item.key] === 'YES';
+      if (isChecked) {
+        doc.setFillColor(34, 197, 94); // emerald-500
+        doc.circle(x + (cellWidth/2), valueY + 7.5, 4, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.text('v', x + (cellWidth/2), valueY + 8.5, { align: 'center' });
+      } else {
+        doc.setDrawColor(200, 200, 200);
+        doc.circle(x + (cellWidth/2), valueY + 7.5, 4, 'S');
+      }
+    });
+
+    yPos += 45;
+    
+    // Car Documents
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Car Documents', 15, yPos);
+    
+    yPos += 8;
+    doc.setDrawColor(220, 230, 250);
+    doc.rect(15, yPos, 180, 10);
+    doc.rect(15, yPos, 130, 10);
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text('SECOND HAND CAR INSPECTION', 20, yPos + 6.5);
+    doc.setTextColor(34, 197, 94);
+    doc.text('Checked', 150, yPos + 6.5);
+    
+    yPos += 25;
+    
+    // Undertaking
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Undertaking', 15, yPos);
+    
+    yPos += 8;
+    doc.setTextColor(110, 110, 110);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('Need help? Call +91 9751969009 | Email: carserviceguru@gmail.com', 105, 265, { align: 'center' });
+    const undertakingText = 'I authorize to execute the jobs described herein using the necessary material cost. I understand that the vehicle is stored, repaired and tested at my own risk.';
+    const splitUndertaking = doc.splitTextToSize(undertakingText, 180);
+    doc.text(splitUndertaking, 15, yPos);
     
-    doc.save(`CSG-Invoice-${booking.id.toString().slice(0, 8)}.pdf`);
+    // Page 2: Terms & Conditions
+    doc.addPage();
+    
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TERMS & CONDITIONS', 105, 35, { align: 'center' });
+    
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(1);
+    doc.line(15, 45, 195, 45);
+    
+    yPos = 70;
+    doc.setLineWidth(0.2);
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    doc.setFont('helvetica', 'normal');
+    
+    const terms = [
+      '• Pickup and Drop time is subject to the availability of drivers.',
+      '• Payment should be made in full during the time of vehicle delivery. In case amount is not confirmed, a tentative amount will be levied.',
+      '• Inventory discrepancies will not be entertained once confirmed by owner at time of delivery.',
+      '• Car Service Guru will not be liable for any delay due to conditions beyond control.',
+      '• Garaging cost (500/day) will be levied if: a) Approval not provided within 7 days for insurance jobs b) Approval not provided within 3 days for other jobs c) Car not picked up within 7 days of completion.',
+      '• Fuel consumed during vehicle transport will be borne by the customer.',
+      '• All personal belongings should be removed. We are not responsible for any loss.',
+      '• Full payment for drivers will be made upon successful delivery.',
+      '• Bodywork/Painting vehicles dispatched only after successful payment and inspection.',
+      '• Repair estimate is based on request and subject to change if additional parts are required.'
+    ];
+    
+    terms.forEach(term => {
+      const splitTerm = doc.splitTextToSize(term, 175);
+      doc.text(splitTerm, 15, yPos);
+      yPos += (splitTerm.length * 7) + 8;
+    });
+    
+    doc.save(`CSG-JobCard-${booking.id.toString().slice(0, 8)}.pdf`);
   };
 
   const getStatusStep = (status: string) => {
@@ -479,19 +602,14 @@ export default function Dashboard({ user }: DashboardProps) {
                                 {(booking.display_status || booking.status || 'pending').replace('_', ' ')}
                               </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-6 text-blue-600/60 font-medium text-sm">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4" />
-                                {new Date(booking.booking_time).toLocaleDateString()}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4" />
-                                {new Date(booking.booking_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4" />
-                                {(booking.location || "").split(',')[0] || "Not specified"}
-                              </div>
+                            <div className="flex flex-wrap items-center gap-6 mt-4">
+                              <button 
+                                onClick={() => downloadPDF(booking)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-bold text-xs hover:bg-blue-100 transition-colors border border-blue-100 shadow-sm"
+                              >
+                                <Download className="w-4 h-4" />
+                                Job Card
+                              </button>
                               <div className="flex items-center gap-2 text-blue-600 font-black">
                                 ₹{booking.total_price || 0}
                               </div>
@@ -510,13 +628,6 @@ export default function Dashboard({ user }: DashboardProps) {
                             })}
                           </div>
                           <div className="flex items-center gap-3">
-                            <button 
-                              onClick={() => downloadPDF(booking)}
-                              className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors border border-blue-100"
-                              title="Download PDF"
-                            >
-                              <Download className="w-5 h-5" />
-                            </button>
                             <button 
                               onClick={() => setExpandedId(isExpanded ? null : booking.id)}
                               className="text-blue-600 font-black text-sm flex items-center gap-2 hover:translate-x-1 transition-transform"

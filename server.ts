@@ -161,11 +161,17 @@ app.get("/api/health", (req, res) => {
 const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: string, phone: string, email?: string }) => {
   console.log(`getOrCreateUser: ${name}, ${phone}, ${email}`);
 
-  // 1. Check if profile exists
+  // Normalize phone for database: digits only + country code 91 if 10 digits
+  const digitsOnlyStr = phone.replace(/\D/g, '');
+  const profilePhone = digitsOnlyStr.length === 10 ? '91' + digitsOnlyStr : digitsOnlyStr;
+
+  // 1. Check if profile exists using original or normalized phone
   let { data: existingProfile, error: profileError } = await supabase
     .from("profiles")
     .select("*")
-    .eq("phone", phone)
+    .or(`phone.eq.${phone},phone.eq.${profilePhone}`)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
 
   if (existingProfile) {
@@ -186,31 +192,29 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
       .single();
     if (profileByEmail) {
       console.log("Found existing profile by email:", profileByEmail.id);
-      // Maybe update phone?
       return profileByEmail;
     }
   }
 
   // 2. Profile doesn't exist, check Auth
   let authId: string | null = null;
-  // Format phone to E.164 constraint (Assuming India +91 if 10 digits)
-  let formattedPhone = phone;
-  const digitsOnly = phone.replace(/\D/g, '');
-  if (digitsOnly.length === 10) {
-    formattedPhone = `+91${digitsOnly}`;
+  // Format phone to E.164 constraint (Assuming India +91 if 10 digits) for Supabase Auth
+  let formattedPhoneAuth = phone;
+  if (digitsOnlyStr.length === 10) {
+    formattedPhoneAuth = `+91${digitsOnlyStr}`;
   } else if (!phone.startsWith('+')) {
-    formattedPhone = `+${digitsOnly}`;
+    formattedPhoneAuth = `+${digitsOnlyStr}`;
   }
 
-  const authEmail = email || `${digitsOnly}@carserviceguru.com`;
+  const authEmail = email || `${digitsOnlyStr}@carserviceguru.com`;
 
-  console.log(`Attempting to create Auth User with email: ${authEmail}, phone: ${formattedPhone}`);
+  console.log(`Attempting to create Auth User with email: ${authEmail}, phone: ${formattedPhoneAuth}`);
 
   // First, try to fetch users to see if they exist before creating
   const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
   if (!listError) {
     const existingAuthUser = users.find((u: any) =>
-      u.phone === formattedPhone ||
+      u.phone === formattedPhoneAuth ||
       u.phone === phone ||
       (u.email && authEmail && u.email.toLowerCase() === authEmail.toLowerCase())
     );
@@ -223,7 +227,7 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
   if (!authId) {
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: authEmail,
-      phone: formattedPhone,
+      phone: formattedPhoneAuth,
       password: crypto.randomBytes(16).toString('hex'),
       email_confirm: true,
       phone_confirm: true,
@@ -250,7 +254,7 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
           throw fallbackError || new Error("Failed to create user account");
         }
       } else {
-        throw authError; // other errors like email exists etc, which should have been caught by listUsers, but if not throw
+        throw authError; 
       }
     } else {
       authId = authUser?.user?.id;
@@ -263,15 +267,16 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
   }
 
   // 3. Create profile
-  console.log(`Creating profile with authId: ${authId}`);
+  console.log(`Creating profile with authId: ${authId}, password: 123456, phone: ${profilePhone}`);
   const { data: newProfile, error: createError } = await supabase
     .from("profiles")
     .insert([{
       id: authId,
       name,
-      phone, // Keep the original phone requested
+      phone: profilePhone,
       email,
-      role: 'customer'
+      role: 'customer',
+      password: '123456'
     }])
     .select()
     .single();
@@ -280,7 +285,7 @@ const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: st
     console.error("Profile creation error:", createError);
     // If it's a conflict, try to fetch it one last time
     if (createError.code === '23505') {
-      const { data: lastTry } = await supabase.from("profiles").select("*").eq("phone", phone).single();
+      const { data: lastTry } = await supabase.from("profiles").select("*").eq("phone", profilePhone).single();
       return lastTry;
     }
     throw createError;
