@@ -16,7 +16,9 @@ import {
   Calendar,
   ChevronDown,
   ShieldCheck,
-  Activity
+  Activity,
+  Truck,
+  Package
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -134,24 +136,34 @@ export default function AdminDashboard() {
   });
 
   const getStatusIcon = (status: string) => {
-    const s = (status || '').toLowerCase().replace(/_/g, '-');
+    const s = (status || '').toLowerCase().replace(/[_-]/g, ' ').trim();
     switch (s) {
       case 'pending': return <Clock className="w-4 h-4 text-amber-500" />;
+      case 'pickup on the way': return <Truck className="w-4 h-4 text-orange-500" />;
       case 'assigned': return <User className="w-4 h-4 text-indigo-500" />;
-      case 'in-progress': return <Activity className="w-4 h-4 text-purple-500" />;
-      case 'completed': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+      case 'in progress': return <Activity className="w-4 h-4 text-purple-500" />;
+      case 'quality check': return <ShieldCheck className="w-4 h-4 text-blue-500" />;
+      case 'ready for delivery': return <Package className="w-4 h-4 text-emerald-500" />;
+      case 'drop on the way': return <MapPin className="w-4 h-4 text-cyan-500" />;
+      case 'delivered':
+      case 'completed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'cancelled': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return null;
     }
   };
 
   const getStatusColor = (status: string) => {
-    const s = (status || 'pending').toLowerCase().replace(/_/g, '-');
+    const s = (status || 'pending').toLowerCase().replace(/[_-]/g, ' ').trim();
     switch (s) {
       case 'pending': return 'bg-amber-100 text-amber-600 border-amber-200';
+      case 'pickup on the way': return 'bg-orange-100 text-orange-600 border-orange-200';
       case 'assigned': return 'bg-indigo-100 text-indigo-600 border-indigo-200';
-      case 'in-progress': return 'bg-purple-100 text-purple-600 border-purple-200';
-      case 'completed': return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case 'in progress': return 'bg-purple-100 text-purple-600 border-purple-200';
+      case 'quality check': return 'bg-blue-100 text-blue-600 border-blue-200';
+      case 'ready for delivery': return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case 'drop on the way': return 'bg-cyan-100 text-cyan-600 border-cyan-200';
+      case 'delivered':
+      case 'completed': return 'bg-green-100 text-green-600 border-green-200';
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200';
       default: return 'bg-stone-100 text-stone-600 border-stone-200';
     }
@@ -194,9 +206,13 @@ export default function AdminDashboard() {
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
-                  <option value="assigned">Assigned</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="completed">Completed</option>
+                  <option value="Pickup on the way">Pickup on the way</option>
+                  <option value="Assigned">Assigned</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Quality Check">Quality Check</option>
+                  <option value="Ready for Delivery">Ready for Delivery</option>
+                  <option value="Drop on the way">Drop on the way</option>
+                  <option value="Delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
@@ -285,9 +301,13 @@ export default function AdminDashboard() {
                         onChange={(e) => updateStatus(booking.id, e.target.value)}
                       >
                         <option value="pending">Pending</option>
-                        <option value="assigned">Assigned</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="completed">Completed</option>
+                        <option value="Pickup on the way">Pickup on the way</option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Quality Check">Quality Check</option>
+                        <option value="Ready for Delivery">Ready for Delivery</option>
+                        <option value="Drop on the way">Drop on the way</option>
+                        <option value="Delivered">Delivered</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </div>

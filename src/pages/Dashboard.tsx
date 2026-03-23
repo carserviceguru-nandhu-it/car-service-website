@@ -19,7 +19,10 @@ import {
   ChevronUp,
   ShieldCheck,
   User,
-  Activity
+  Activity,
+  Truck,
+  Package,
+  Settings
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { jsPDF } from 'jspdf';
@@ -364,24 +367,34 @@ export default function Dashboard({ user }: DashboardProps) {
   };
 
   const getStatusStep = (status: string) => {
-    const s = (status || '').toLowerCase().replace(/_/g, ' ');
+    const s = (status || '').toLowerCase().replace(/[_-]/g, ' ').trim();
     switch (s) {
-      case 'pending': return 0;
-      case 'assigned': return 1;
-      case 'in-progress': return 2;
-      case 'completed': return 5;
+      case 'pickup on the way': return 1;
+      case 'assigned': return 2;
+      case 'in progress': return 3;
+      case 'quality check': return 4;
+      case 'ready for delivery': return 5;
+      case 'drop on the way': return 6;
+      case 'delivered': return 7;
+      case 'completed': return 7;
       case 'cancelled': return -1;
+      case 'pending': return 0;
       default: return 0;
     }
   };
 
   const getStatusColor = (bookingStatus: string) => {
-    const status = (bookingStatus || 'pending').toLowerCase().replace(/_/g, '-');
+    const status = (bookingStatus || 'pending').toLowerCase().replace(/[_-]/g, ' ').trim();
     switch (status) {
       case 'pending': return 'bg-amber-100 text-amber-600 border-amber-200';
+      case 'pickup on the way': return 'bg-orange-100 text-orange-600 border-orange-200';
       case 'assigned': return 'bg-blue-100 text-blue-600 border-blue-200';
-      case 'in-progress': return 'bg-purple-100 text-purple-600 border-purple-200';
-      case 'completed': return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case 'in progress': return 'bg-purple-100 text-purple-600 border-purple-200';
+      case 'quality check': return 'bg-indigo-100 text-indigo-600 border-indigo-200';
+      case 'ready for delivery': return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case 'drop on the way': return 'bg-cyan-100 text-cyan-600 border-cyan-200';
+      case 'delivered':
+      case 'completed': return 'bg-green-100 text-green-600 border-green-200';
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200';
       default: return 'bg-stone-100 text-stone-600 border-stone-200';
     }
@@ -528,14 +541,18 @@ export default function Dashboard({ user }: DashboardProps) {
                               <div className="absolute top-5 left-0 w-full h-1 bg-stone-100 rounded-full overflow-hidden">
                                 <div 
                                   className="h-full bg-blue-600 transition-all duration-500" 
-                                  style={{ width: currentStep === -1 ? '0%' : `${(currentStep - 1) * 25}%` }}
+                                  style={{ width: currentStep === -1 ? '0%' : `${Math.max(0, (currentStep - 1)) * (100 / 6)}%` }}
                                 ></div>
                               </div>
                               <div className="relative flex justify-between">
                                 {[
+                                  { label: 'Pickup', icon: Truck },
                                   { label: 'Assigned', icon: User },
                                   { label: 'In Progress', icon: Activity },
-                                  { label: 'Completed', icon: CheckCircle2 }
+                                  { label: 'Quality Check', icon: ShieldCheck },
+                                  { label: 'Ready', icon: Package },
+                                  { label: 'Drop', icon: MapPin },
+                                  { label: 'Delivered', icon: CheckCircle2 }
                                 ].map((step, i) => {
                                   const stepNum = i + 1;
                                   const isCompleted = currentStep >= stepNum;
@@ -551,7 +568,7 @@ export default function Dashboard({ user }: DashboardProps) {
                                       `}>
                                         <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                                       </div>
-                                      <span className={`text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-center px-1 ${isCompleted ? 'text-blue-600' : 'text-stone-400'}`}>
+                                      <span className={`text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-center px-1 ${isCompleted ? 'text-blue-600' : 'text-stone-400'}`}>
                                         {step.label}
                                       </span>
                                     </div>
