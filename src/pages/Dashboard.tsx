@@ -253,31 +253,79 @@ export default function Dashboard({ user }: DashboardProps) {
     }
   };
 
-  const downloadPDF = (booking: any) => {
+  const downloadPDF = async (booking: any) => {
+    // Fetch garage name if garage_id is present
+    let garageName = booking.workshop_name || 'Car Service Guru';
+    if (booking.garage_id) {
+      try {
+        const { data: garageData } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', booking.garage_id)
+          .single();
+        if (garageData?.name) {
+          garageName = garageData.name;
+        }
+      } catch (e) {
+        console.warn('Could not fetch garage name:', e);
+      }
+    }
+
     const doc = new jsPDF();
     const primaryColor = [37, 99, 235]; // blue-600
-    const accentColor = [30, 41, 59]; // slate-800
+    const accentColor = [13, 27, 52]; // dark navy
     
-    // Header Section
-    doc.setFillColor( accentColor[0], accentColor[1], accentColor[2]);
-    doc.rect(0, 0, 210, 40, 'F');
+    // Header Section - dark navy background
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.rect(0, 0, 210, 42, 'F');
+
+    // Try to embed the logo image
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => resolve();
+        logoImg.src = '/src/assets/logo.jpg';
+      });
+      if (logoImg.complete && logoImg.naturalHeight > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = logoImg.naturalWidth;
+        canvas.height = logoImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(logoImg, 0, 0);
+          const imgData = canvas.toDataURL('image/jpeg');
+          doc.addImage(imgData, 'JPEG', 5, 3, 36, 36);
+        }
+      }
+    } catch (e) {
+      console.warn('Logo load failed, using text fallback');
+    }
     
-    // Logo Text (as we don't have the image easily)
+    // Brand name & tagline
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(28);
+    doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('CAR SERVICE GURU', 25, 22);
+    doc.text('CAR SERVICE GURU', 46, 20);
     
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('EXPERT CARE • SMART AI', 25, 30);
+    doc.setTextColor(100, 200, 255);
+    doc.text('EXPERT CARE • SMART AI', 46, 29);
+
+    // Red dot accent
+    doc.setFillColor(220, 50, 50);
+    doc.circle(130, 27, 1.5, 'F');
     
-    doc.setFontSize(20);
+    // JOB CARD text on right
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('JOB CARD', 150, 25);
+    doc.setTextColor(255, 255, 255);
+    doc.text('JOB CARD', 168, 25);
     
     // Main Content
-    let yPos = 55;
+    let yPos = 57;
     
     // Section Header: Customer & Vehicle Details
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -356,7 +404,7 @@ export default function Dashboard({ user }: DashboardProps) {
     const bDate = booking.scheduled_date || new Date(booking.booking_time).toLocaleDateString();
     const bTime = booking.scheduled_time || new Date(booking.booking_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    drawMiniCard(15, yPos, 'Workshop', booking.workshop_name || 'Car Service Guru', [200, 150, 80]);
+    drawMiniCard(15, yPos, 'Workshop', garageName, [200, 150, 80]);
     drawMiniCard(78, yPos, 'Walkin Date', bDate, [220, 50, 50]);
     drawMiniCard(141, yPos, 'Walkin Time', bTime, [100, 100, 250]);
     
@@ -385,33 +433,52 @@ export default function Dashboard({ user }: DashboardProps) {
     const cellWidth = 22;
     doc.setDrawColor(220, 230, 250);
     
+    // Parse inventory from the database column (JSON object or string-based)
+    let inventoryData: Record<string, any> = {};
+    if (booking.inventory) {
+      if (typeof booking.inventory === 'object') {
+        inventoryData = booking.inventory;
+      } else if (typeof booking.inventory === 'string') {
+        try { inventoryData = JSON.parse(booking.inventory); } catch { inventoryData = {}; }
+      }
+    }
+
     items.forEach((item, i) => {
       const x = 15 + (i * cellWidth);
       doc.setFillColor(248, 250, 255);
+      doc.setDrawColor(220, 230, 250);
       doc.rect(x, yPos, cellWidth, 10, 'F');
       doc.rect(x, yPos, cellWidth, 10, 'S');
       
       doc.setFontSize(7);
       doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
       doc.text(item.label, x + (cellWidth/2), yPos + 6.5, { align: 'center' });
       
       // Value cell
       const valueY = yPos + 10;
       doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(220, 230, 250);
       doc.rect(x, valueY, cellWidth, 15, 'F');
       doc.rect(x, valueY, cellWidth, 15, 'S');
       
-      const isChecked = booking[item.key] === true || booking[item.key] === 'Checked' || booking[item.key] === 'YES';
+      // Check state: first from inventory JSON, then from direct booking field
+      const invVal = inventoryData[item.key];
+      const directVal = booking[item.key];
+      const isChecked = invVal === true || invVal === 'Checked' || invVal === 'YES' || invVal === 1 ||
+                        directVal === true || directVal === 'Checked' || directVal === 'YES';
       if (isChecked) {
         doc.setFillColor(34, 197, 94); // emerald-500
         doc.circle(x + (cellWidth/2), valueY + 7.5, 4, 'F');
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(8);
-        doc.text('v', x + (cellWidth/2), valueY + 8.5, { align: 'center' });
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('✓', x + (cellWidth/2), valueY + 9, { align: 'center' });
       } else {
         doc.setDrawColor(200, 200, 200);
         doc.circle(x + (cellWidth/2), valueY + 7.5, 4, 'S');
       }
+      doc.setFont('helvetica', 'normal');
     });
 
     yPos += 45;
@@ -450,18 +517,30 @@ export default function Dashboard({ user }: DashboardProps) {
     
     // Page 2: Terms & Conditions
     doc.addPage();
-    
+
+    // Page 2 header – same brand style
     doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(24);
+    doc.rect(0, 0, 210, 42, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('TERMS & CONDITIONS', 105, 35, { align: 'center' });
-    
+    doc.text('CAR SERVICE GURU', 46, 20);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 200, 255);
+    doc.text('EXPERT CARE • SMART AI', 46, 29);
+    doc.setFillColor(220, 50, 50);
+    doc.circle(130, 27, 1.5, 'F');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('TERMS & CONDITIONS', 168, 25, { align: 'right' });
+
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setLineWidth(1);
-    doc.line(15, 45, 195, 45);
-    
-    yPos = 70;
+    doc.setLineWidth(0.5);
+    doc.line(15, 50, 195, 50);
+
+    yPos = 62;
     doc.setLineWidth(0.2);
     doc.setFontSize(11);
     doc.setTextColor(30, 30, 30);

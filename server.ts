@@ -48,6 +48,8 @@ const sendBookingNotification = async (details: any) => {
     }
   });
 
+  const formattedPhone = phone?.toString().startsWith('+') ? phone : `+${phone}`;
+
   const mailOptions = {
     from: '"Car Service Guru" <carserviceguru@gmail.com>',
     to: 'carserviceguru@gmail.com',
@@ -58,7 +60,7 @@ const sendBookingNotification = async (details: any) => {
       Customer Details:
       ----------------
       Name: ${customerName}
-      Phone: ${phone}
+      Phone: ${formattedPhone}
       Email: ${email || 'N/A'}
       
       Vehicle Details:
