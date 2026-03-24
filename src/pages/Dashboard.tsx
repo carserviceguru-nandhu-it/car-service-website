@@ -255,7 +255,7 @@ export default function Dashboard({ user }: DashboardProps) {
 
   const downloadPDF = async (booking: any) => {
     // Fetch garage name if garage_id is present
-    let garageName = booking.workshop_name || 'Car Service Guru';
+    let garageName = booking.workshop_name || '';
     if (booking.garage_id) {
       try {
         const { data: garageData } = await supabase
@@ -286,7 +286,7 @@ export default function Dashboard({ user }: DashboardProps) {
       await new Promise<void>((resolve) => {
         logoImg.onload = () => resolve();
         logoImg.onerror = () => resolve();
-        logoImg.src = '/src/assets/logo.jpg';
+        logoImg.src = '/logo.jpeg';
       });
       if (logoImg.complete && logoImg.naturalHeight > 0) {
         const canvas = document.createElement('canvas');
@@ -359,17 +359,17 @@ export default function Dashboard({ user }: DashboardProps) {
       doc.text(String(val2 || 'N/A'), 148, rowY + 6.5);
     };
 
-    drawTableRow(yPos, 'Customer Name', booking.profiles?.name || 'N/A', 'Mobile Number', booking.profiles?.phone || 'N/A');
+    drawTableRow(yPos, 'Customer Name', booking.profiles?.name || '', 'Mobile Number', booking.profiles?.phone || '');
     yPos += 10;
-    drawTableRow(yPos, 'Vehicle Brand', booking.car_brand, 'Vehicle Model', booking.car_model);
+    drawTableRow(yPos, 'Vehicle Brand', booking.car_brand || '', 'Vehicle Model', booking.car_model || '');
     yPos += 10;
-    drawTableRow(yPos, 'Registration No', booking.registration_no || '', 'Odometer Rd', booking.odometer_reading || '0');
+    drawTableRow(yPos, 'Registration No', booking.registration_no || '', 'Odometer Rd', booking.odometer_reading || '');
     yPos += 10;
-    drawTableRow(yPos, 'Fuel Status', booking.fuel_status || 'N/A', 'Booking ID', (booking.id || '').toString().slice(0, 8).toUpperCase());
+    drawTableRow(yPos, 'Fuel Status', booking.fuel_status || '', 'Booking ID', (booking.id || '').toString().slice(0, 8).toUpperCase());
     yPos += 10;
-    drawTableRow(yPos, 'Battery Details', booking.battery_details || 'Amaron', 'Fuel Type', booking.fuel_type || 'Petrol');
+    drawTableRow(yPos, 'Battery Details', booking.battery_details || '', 'Fuel Type', booking.fuel_type || '');
     yPos += 10;
-    drawTableRow(yPos, 'Supervisor', booking.supervisor || 'Nandhu', 'Car Variant', booking.car_variant || 'N/A');
+    drawTableRow(yPos, 'Supervisor', booking.supervisor || '', 'Car Variant', booking.car_variant || '');
     
     yPos += 25;
     
@@ -518,29 +518,17 @@ export default function Dashboard({ user }: DashboardProps) {
     // Page 2: Terms & Conditions
     doc.addPage();
 
-    // Page 2 header – same brand style
-    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.rect(0, 0, 210, 42, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    // Page 2 sub header
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('CAR SERVICE GURU', 46, 20);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 200, 255);
-    doc.text('EXPERT CARE • SMART AI', 46, 29);
-    doc.setFillColor(220, 50, 50);
-    doc.circle(130, 27, 1.5, 'F');
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('TERMS & CONDITIONS', 168, 25, { align: 'right' });
+    doc.text('TERMS & CONDITIONS', 105, 20, { align: 'center' });
 
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setLineWidth(0.5);
-    doc.line(15, 50, 195, 50);
+    doc.line(15, 25, 195, 25);
 
-    yPos = 62;
+    yPos = 35;
     doc.setLineWidth(0.2);
     doc.setFontSize(11);
     doc.setTextColor(30, 30, 30);
