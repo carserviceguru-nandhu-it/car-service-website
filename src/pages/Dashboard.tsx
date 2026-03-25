@@ -191,7 +191,8 @@ export default function Dashboard({ user }: DashboardProps) {
           car_model: model,
           location: address,
           services: finalServices,
-          display_status: normalizedStatus
+          display_status: normalizedStatus,
+          service_status: b.service_status
         };
       }));
       setBookings(normalizedData);
@@ -558,6 +559,7 @@ export default function Dashboard({ user }: DashboardProps) {
 
   const getStatusStep = (status: string) => {
     const s = (status || '').toLowerCase().replace(/[_-]/g, ' ').trim();
+    if (s.includes('cancelled by garage')) return -2;
     switch (s) {
       case 'pickup on the way': return 1;
       case 'assigned': return 2;
@@ -575,6 +577,7 @@ export default function Dashboard({ user }: DashboardProps) {
 
   const getStatusColor = (bookingStatus: string) => {
     const status = (bookingStatus || 'pending').toLowerCase().replace(/[_-]/g, ' ').trim();
+    if (status.includes('cancelled by garage')) return 'bg-rose-100 text-rose-600 border-rose-200';
     switch (status) {
       case 'pending': return 'bg-amber-100 text-amber-600 border-amber-200';
       case 'pickup on the way': return 'bg-orange-100 text-orange-600 border-orange-200';
@@ -665,10 +668,18 @@ export default function Dashboard({ user }: DashboardProps) {
                           <div>
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-2xl font-black text-blue-900">{booking.car_brand} {booking.car_model}</h3>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(booking.display_status || booking.status)}`}>
-                                {(booking.display_status || booking.status || 'pending').replace('_', ' ')}
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(booking.service_status?.includes('Cancelled') ? booking.service_status : (booking.display_status || booking.status))}`}>
+                                {(booking.service_status?.includes('Cancelled') ? booking.service_status : (booking.display_status || booking.status || 'pending')).replace('_', ' ')}
                               </span>
                             </div>
+                            {booking.service_status?.includes('Cancelled') && (
+                              <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-3 rounded-xl mt-2">
+                                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                                <p className="text-[11px] font-bold text-rose-700 leading-tight">
+                                  {booking.service_status}. Our team is working to reassign your service.
+                                </p>
+                              </div>
+                            )}
                             <div className="flex flex-wrap items-center gap-6 mt-4">
                               <button 
                                 onClick={() => downloadPDF(booking)}
