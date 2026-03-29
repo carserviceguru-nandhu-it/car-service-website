@@ -163,15 +163,19 @@ app.get("/api/health", (req, res) => {
 const getOrCreateUser = async (supabase: any, { name, phone, email }: { name: string, phone: string, email?: string }) => {
   console.log(`getOrCreateUser: ${name}, ${phone}, ${email}`);
 
-  // Normalize phone for database: digits only + country code 91 if 10 digits
+  // Normalize phone for database: always store as +91XXXXXXXXXX for 10-digit numbers
   const digitsOnlyStr = phone.replace(/\D/g, '');
-  const profilePhone = digitsOnlyStr.length === 10 ? '91' + digitsOnlyStr : digitsOnlyStr;
+  // Store with +91 prefix for new customers if 10 digits (Indian numbers)
+  const profilePhone = digitsOnlyStr.length === 10 ? `+91${digitsOnlyStr}` : (phone.startsWith('+') ? phone : `+${digitsOnlyStr}`);
+
+  // Also check the old format (91XXXXXXXXXX without +) for backwards compatibility
+  const legacyPhone = digitsOnlyStr.length === 10 ? `91${digitsOnlyStr}` : digitsOnlyStr;
 
   // 1. Check if profile exists using original or normalized phone
   let { data: existingProfile, error: profileError } = await supabase
     .from("profiles")
     .select("*")
-    .or(`phone.eq.${phone},phone.eq.${profilePhone}`)
+    .or(`phone.eq.${phone},phone.eq.${profilePhone},phone.eq.${legacyPhone}`)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();

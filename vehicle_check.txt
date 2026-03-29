@@ -1,0 +1,28 @@
+﻿[dotenv@17.3.1] injecting env (4) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+Vehicles: [
+  {
+    "id": "f420a153-bc0c-474b-bf61-f7f90307b001",
+    "brand": "MAHINDRA",
+    "model": "XUV 700"
+  },
+  {
+    "id": "d1f0800d-24e7-4b39-a604-1f7e47d6c763",
+    "brand": "Tata india",
+    "model": "India"
+  },
+  {
+    "id": "f3d47e9a-4537-4fd9-b17e-1616c9408860",
+    "brand": "Hyundai ",
+    "model": "i20"
+  },
+  {
+    "id": "00c413be-d87c-43aa-b9a9-d73b64de8f2e",
+    "brand": "Ford",
+    "model": "civic"
+  },
+  {
+    "id": "a3d8232c-8087-47df-8506-c43509f7bd32",
+    "brand": "Volgwagen",
+    "model": "Polo"
+  }
+]

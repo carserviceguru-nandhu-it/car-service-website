@@ -183,12 +183,19 @@ export default function Dashboard({ user }: DashboardProps) {
         if (normalizedStatus === 'canceled') {
           normalizedStatus = 'cancelled';
         }
+
+        // Normalize customer details
+        const cName = b.profiles?.name || b.customer_name || b.name || user.user_metadata?.full_name || user.name || "Customer";
+        const cPhone = b.profiles?.phone || b.customer_phone || b.phone || user.phone || "";
+
         return {
           ...b,
           booking_time: bTime,
           total_price: b.total_cost || b.total_price || b.price || b.amount || 0,
           car_brand: brand,
           car_model: model,
+          customer_name: cName,
+          customer_phone: cPhone,
           location: address,
           services: finalServices,
           display_status: normalizedStatus,
@@ -275,6 +282,33 @@ export default function Dashboard({ user }: DashboardProps) {
     const doc = new jsPDF();
     const primaryColor = [37, 99, 235]; // blue-600
     const accentColor = [13, 27, 52]; // dark navy
+
+    // Fetch customer details if they're missing or "N/A"
+    let cName = booking.customer_name || booking.profiles?.name || '';
+    let cPhone = booking.customer_phone || booking.profiles?.phone || '';
+
+    if (!cName || !cPhone || cName === "Customer") {
+      try {
+        const uId = booking.user_id || booking.userId || user.id;
+        if (uId) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('name, phone')
+            .eq('id', uId)
+            .single();
+          if (profileData) {
+            cName = profileData.name || cName;
+            cPhone = profileData.phone || cPhone;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch customer details:', e);
+      }
+    }
+
+    // Use user prop as last resort
+    cName = cName || user.user_metadata?.full_name || user.name || "Customer";
+    cPhone = cPhone || user.phone || "";
     
     // Header Section - dark navy background
     doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
@@ -360,7 +394,7 @@ export default function Dashboard({ user }: DashboardProps) {
       doc.text(String(val2 || 'N/A'), 148, rowY + 6.5);
     };
 
-    drawTableRow(yPos, 'Customer Name', booking.profiles?.name || '', 'Mobile Number', booking.profiles?.phone || '');
+    drawTableRow(yPos, 'Customer Name', cName, 'Mobile Number', cPhone);
     yPos += 10;
     drawTableRow(yPos, 'Vehicle Brand', booking.car_brand || '', 'Vehicle Model', booking.car_model || '');
     yPos += 10;
@@ -554,8 +588,391 @@ export default function Dashboard({ user }: DashboardProps) {
       yPos += (splitTerm.length * 7) + 8;
     });
     
-    doc.save(`CSG-JobCard-${booking.id.toString().slice(0, 8)}.pdf`);
+    const customerNameSlug = cName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '') || 'Customer';
+    const dateStr = new Date().toISOString().slice(0, 10);
+    doc.save(`${customerNameSlug}_jobcard_${dateStr}.pdf`);
   };
+
+  const downloadInvoicePDF = async (booking: any) => {
+    // Fetch garage name if garage_id is present
+    let garageName = booking.workshop_name || '';
+    if (booking.garage_id) {
+      try {
+        const { data: garageData } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', booking.garage_id)
+          .single();
+        if (garageData?.name) {
+          garageName = garageData.name;
+        }
+      } catch (e) {
+        console.warn('Could not fetch garage name:', e);
+      }
+    }
+
+    const doc = new jsPDF();
+    const primaryColor = [37, 99, 235]; // blue-600
+    const accentColor = [13, 27, 52]; // dark navy
+
+    // Fetch customer details
+    let cName = booking.customer_name || booking.profiles?.name || '';
+    let cPhone = booking.customer_phone || booking.profiles?.phone || '';
+
+    if (!cName || !cPhone || cName === 'Customer') {
+      try {
+        const uId = booking.user_id || booking.userId || user.id;
+        if (uId) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('name, phone')
+            .eq('id', uId)
+            .single();
+          if (profileData) {
+            cName = profileData.name || cName;
+            cPhone = profileData.phone || cPhone;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch customer details:', e);
+      }
+    }
+
+    cName = cName || user.user_metadata?.full_name || user.name || 'Customer';
+    cPhone = cPhone || user.phone || '';
+
+    // Format phone with +91 if not already
+    if (cPhone && !cPhone.startsWith('+')) {
+      const digits = cPhone.replace(/\D/g, '');
+      cPhone = digits.length === 10 ? `+91 ${digits}` : `+91${digits}`;
+    } else if (cPhone && cPhone.startsWith('+91') && cPhone.length > 3) {
+      const digits = cPhone.replace(/\D/g, '').slice(2);
+      cPhone = `+91 ${digits}`;
+    }
+
+    // Fetch invoice data from admin_invoices if available
+    let invoiceData: any = null;
+    try {
+      const { data: invData } = await supabase
+        .from('admin_invoices')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .single();
+      invoiceData = invData;
+    } catch (e) {
+      console.warn('No invoice data found:', e);
+    }
+
+    const services = booking.services || [];
+    const orderValue = booking.total_price || 0;
+    const discount = invoiceData?.discount || 0;
+    const discountType = invoiceData?.discount_type || 'fixed';
+    const discountAmt = discountType === 'percent' ? Math.round(orderValue * discount / 100) : discount;
+    const discountLabel = invoiceData?.discount_label || (discountAmt > 0 ? 'Discount' : '');
+    const tax = invoiceData?.tax || 0;
+    const grandTotal = invoiceData?.grand_total || (orderValue - discountAmt + tax) || orderValue;
+    const remarks = invoiceData?.remarks || booking.notes || booking.additional_notes || '';
+    const deliveryDate = booking.scheduled_date || booking.delivery_date || (booking.booking_time ? new Date(booking.booking_time).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'));
+    const regNo = booking.registration_no || booking.reg_no || booking.vehicle_reg || '';
+    const odometer = booking.odometer_reading || booking.odometer || '';
+    const fuelType = booking.fuel_type || '';
+    const carVariant = booking.car_variant || booking.car_model || '';
+    const city = booking.city || 'N/A';
+    const orderId = booking.id ? booking.id.toString().slice(0, 13) : '';
+    const address = booking.location || booking.address || 'N/A';
+
+    // ===========================
+    // PAGE 1: INVOICE
+    // ===========================
+
+    // Header - dark navy background
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.rect(0, 0, 210, 42, 'F');
+
+    // Logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => resolve();
+        logoImg.src = '/logo.jpeg';
+      });
+      if (logoImg.complete && logoImg.naturalHeight > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = logoImg.naturalWidth;
+        canvas.height = logoImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(logoImg, 0, 0);
+          const imgData = canvas.toDataURL('image/jpeg');
+          doc.addImage(imgData, 'JPEG', 5, 3, 36, 36);
+        }
+      }
+    } catch (e) {
+      console.warn('Logo load failed');
+    }
+
+    // Brand name
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CAR SERVICE GURU', 46, 20);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 200, 255);
+    doc.text('EXPERT CARE • SMART AI', 46, 29);
+
+    // Order Summary label top right
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Order Summary', 155, 25);
+
+    let yPos = 52;
+
+    // ---- Customer/Vehicle Details Table ----
+    const drawCell = (x: number, y: number, w: number, h: number, label: string, value: string, labelBold = true) => {
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(x, y, w / 2, h);
+      doc.rect(x + w / 2, y, w / 2, h);
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('helvetica', labelBold ? 'bold' : 'normal');
+      doc.text(label, x + 2, y + h / 2 + 2);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      const valStr = String(value || 'N/A');
+      doc.text(valStr, x + w / 2 + 2, y + h / 2 + 2);
+    };
+
+    const rowH = 9;
+    const col1X = 14;
+    const col2X = 110;
+    const colW = 96;
+
+    drawCell(col1X, yPos, colW, rowH, 'Customer Name', cName);
+    drawCell(col2X, yPos, colW, rowH, 'Brand', booking.car_brand || '');
+    yPos += rowH;
+    drawCell(col1X, yPos, colW, rowH, 'Delivery Date', deliveryDate);
+    drawCell(col2X, yPos, colW, rowH, 'Fuel Type', fuelType);
+    yPos += rowH;
+    drawCell(col1X, yPos, colW, rowH, 'Reg No', regNo);
+    drawCell(col2X, yPos, colW, rowH, 'Model', carVariant);
+    yPos += rowH;
+    drawCell(col1X, yPos, colW, rowH, 'Order Id', orderId);
+    drawCell(col2X, yPos, colW, rowH, 'Odometer Rd', odometer);
+    yPos += rowH;
+    drawCell(col1X, yPos, colW, rowH, 'Workshop Name', garageName);
+    drawCell(col2X, yPos, colW, rowH, 'City', city);
+    yPos += rowH;
+    // Full width address row
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(col1X, yPos, 48, rowH);
+    doc.rect(col1X + 48, yPos, colW * 2 - 48, rowH);
+    doc.setFontSize(8.5);
+    doc.setTextColor(80, 80, 80);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Address', col1X + 2, yPos + rowH / 2 + 2);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    const addrSplit = doc.splitTextToSize(String(address), colW * 2 - 52);
+    doc.text(addrSplit[0] || '', col1X + 50, yPos + rowH / 2 + 2);
+    yPos += rowH + 10;
+
+    // ---- Services Section ----
+    doc.setFillColor(245, 247, 255);
+    doc.rect(col1X, yPos, 192, 8, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(col1X, yPos, 192, 8);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text('Service Items', col1X + 4, yPos + 5.5);
+    doc.text('Amount (INR)', col1X + 150, yPos + 5.5);
+    yPos += 8;
+
+    services.forEach((s: any) => {
+      const sName = typeof s === 'object' ? (s.name || '') : String(s);
+      const sPrice = typeof s === 'object' ? (s.price || 0) : 0;
+      doc.setDrawColor(220, 220, 220);
+      doc.rect(col1X, yPos, 192, 8);
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+      doc.setFont('helvetica', 'normal');
+      doc.text(sName, col1X + 4, yPos + 5.5);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text(`Rs. ${sPrice}`, col1X + 150, yPos + 5.5);
+      yPos += 8;
+    });
+
+    yPos += 6;
+
+    // ---- Order Summary Table ----
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('Order Summary', 105, yPos, { align: 'center' });
+    yPos += 6;
+
+    const drawSummaryRow = (label: string, value: string, valueColor?: number[], remarkLabel?: string, remarkValue?: string) => {
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(col1X, yPos, 96, 9);
+      doc.rect(col1X + 96, yPos, 96, 9);
+      doc.setFontSize(8.5);
+      doc.setTextColor(50, 50, 50);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, col1X + 3, yPos + 6);
+      doc.setFont('helvetica', 'normal');
+      if (valueColor) doc.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
+      else doc.setTextColor(0, 0, 0);
+      doc.text(value, col1X + 3 + (label === 'Grand Total' ? 0 : 0), yPos + 6);
+      // Right cell
+      doc.setTextColor(100, 100, 100);
+      if (remarkLabel) doc.text(remarkLabel, col1X + 99, yPos + 6);
+      if (remarkValue) {
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text(remarkValue, col1X + 140, yPos + 6);
+      }
+      yPos += 9;
+    };
+
+    // Order Value row
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(col1X, yPos, 96, 9);
+    doc.rect(col1X + 96, yPos, 96, 9);
+    doc.setFontSize(8.5);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Order Value', col1X + 3, yPos + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Rs. ${orderValue}`, col1X + 40, yPos + 6);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Remarks', col1X + 99, yPos + 6);
+    yPos += 9;
+
+    // Discount row
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(col1X, yPos, 96, 9);
+    doc.rect(col1X + 96, yPos, 96, 9);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(50, 50, 50);
+    doc.text(discountAmt > 0 ? `Discount (${discountType === 'percent' ? discount + '%' : 'fixed'})` : 'Discount', col1X + 3, yPos + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(220, 50, 50);
+    doc.text(discountAmt > 0 ? `- Rs. ${discountAmt}` : 'Rs. 0', col1X + 40, yPos + 6);
+    // Right cell with loyalty label
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    if (discountLabel) doc.text(discountLabel, col1X + 99, yPos + 6);
+    yPos += 9;
+
+    // Tax row
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(col1X, yPos, 96, 9);
+    doc.rect(col1X + 96, yPos, 96, 9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(50, 50, 50);
+    doc.text('Tax', col1X + 3, yPos + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Rs. ${tax}`, col1X + 40, yPos + 6);
+    yPos += 9;
+
+    // Grand Total row
+    doc.setFillColor(245, 247, 255);
+    doc.rect(col1X, yPos, 96, 9, 'FD');
+    doc.rect(col1X + 96, yPos, 96, 9, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(20, 20, 20);
+    doc.text('Grand Total', col1X + 3, yPos + 6.5);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(`Rs. ${grandTotal}`, col1X + 40, yPos + 6.5);
+    yPos += 12;
+
+    // Additional Notes
+    if (remarks) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(50, 50, 50);
+      doc.text('Additional Notes', col1X, yPos);
+      yPos += 6;
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(col1X, yPos, 192, 20);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      const notesSplit = doc.splitTextToSize(remarks, 185);
+      doc.text(notesSplit, col1X + 3, yPos + 6);
+    }
+
+    // ===========================
+    // PAGE 2: TERMS & CONDITION (DISCLAIMER)
+    // ===========================
+    doc.addPage();
+
+    // Disclaimer header - dark background
+    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.rect(0, 40, 210, 14, 'F');
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Terms and Condition', 105, 49, { align: 'center' });
+
+    yPos = 65;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+
+    const disclaimerItems = [
+      { text: 'Prices are inclusive of all applicable taxes', color: [50, 50, 50] as [number, number, number] },
+      { text: 'This is a summary of the order placed on Car Service Guru and not a tax Invoice.', color: [37, 99, 235] as [number, number, number] },
+      { text: '  The Tax invoice shall be provided by the workshop directly.', color: [37, 99, 235] as [number, number, number] },
+      { text: 'Colour of Engine Oil might turn black post service in Diesel Cars.', color: [220, 120, 20] as [number, number, number] },
+      { text: 'Safety & Warranty Fees covers Skill India Training, Pickup & Drop Warranty', color: [220, 120, 20] as [number, number, number] },
+      { text: '  & Upskilling of Workshop Partners', color: [220, 120, 20] as [number, number, number] },
+    ];
+
+    disclaimerItems.forEach(item => {
+      const bullet = item.text.startsWith('  ') ? '' : '• ';
+      doc.setTextColor(item.color[0], item.color[1], item.color[2]);
+      const fullText = bullet + item.text;
+      const split = doc.splitTextToSize(fullText, 180);
+      doc.text(split, 15, yPos);
+      yPos += split.length * 7 + 2;
+    });
+
+    yPos += 15;
+
+    // Full terms
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    const fullTerms = [
+      '• Pickup and Drop time is subject to the availability of drivers.',
+      '• Payment should be made in full during the time of vehicle delivery.',
+      '• Inventory discrepancies will not be entertained once confirmed by owner at time of delivery.',
+      '• Car Service Guru will not be liable for any delay due to conditions beyond control.',
+      '• Garaging cost (500/day) will be levied if: a) Approval not provided within 7 days for insurance jobs b) Approval not provided within 3 days for other jobs c) Car not picked up within 7 days of completion.',
+      '• Fuel consumed during vehicle transport will be borne by the customer.',
+      '• All personal belongings should be removed. We are not responsible for any loss.',
+      '• Bodywork/Painting vehicles dispatched only after successful payment and inspection.',
+    ];
+
+    fullTerms.forEach(term => {
+      const split = doc.splitTextToSize(term, 180);
+      doc.text(split, 15, yPos);
+      yPos += split.length * 6 + 4;
+    });
+
+    const customerNameSlug2 = cName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '') || 'Customer';
+    const dateStr2 = new Date().toISOString().slice(0, 10);
+    doc.save(`${customerNameSlug2}_invoice_${dateStr2}.pdf`);
+  };
+
 
   const getStatusStep = (status: string) => {
     const s = (status || '').toLowerCase().replace(/[_-]/g, ' ').trim();
@@ -647,9 +1064,11 @@ export default function Dashboard({ user }: DashboardProps) {
             </h2>
             <div className="space-y-6">
               {bookings.map((booking, idx) => {
-                const currentStep = getStatusStep(booking.display_status || booking.status);
+                const isGarageCancelled = booking.service_status?.toLowerCase().includes('cancelled');
+                const finalDisplayStatus = isGarageCancelled ? booking.service_status : (booking.display_status || booking.status || 'pending');
+                const currentStep = getStatusStep(finalDisplayStatus);
                 const isExpanded = expandedId === booking.id;
-                const canCancel = !booking.garage_id && booking.status !== 'completed' && !booking.status.includes('cancelled');
+                const canCancel = !isGarageCancelled && !booking.garage_id && booking.status !== 'completed' && !booking.status.includes('cancelled');
 
                 return (
                   <motion.div 
@@ -668,11 +1087,11 @@ export default function Dashboard({ user }: DashboardProps) {
                           <div>
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-2xl font-black text-blue-900">{booking.car_brand} {booking.car_model}</h3>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(booking.service_status?.includes('Cancelled') ? booking.service_status : (booking.display_status || booking.status))}`}>
-                                {(booking.service_status?.includes('Cancelled') ? booking.service_status : (booking.display_status || booking.status || 'pending')).replace('_', ' ')}
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(finalDisplayStatus)}`}>
+                                {finalDisplayStatus.replace('_', ' ')}
                               </span>
                             </div>
-                            {booking.service_status?.includes('Cancelled') && (
+                            {isGarageCancelled && (
                               <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-3 rounded-xl mt-2">
                                 <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                                 <p className="text-[11px] font-bold text-rose-700 leading-tight">
@@ -687,6 +1106,13 @@ export default function Dashboard({ user }: DashboardProps) {
                               >
                                 <Download className="w-4 h-4" />
                                 Job Card
+                              </button>
+                              <button 
+                                onClick={() => downloadInvoicePDF(booking)}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-colors border border-emerald-100 shadow-sm"
+                              >
+                                <Download className="w-4 h-4" />
+                                Invoice
                               </button>
                               <div className="flex items-center gap-2 text-blue-600 font-black">
                                 ₹{booking.total_price || 0}

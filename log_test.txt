@@ -1,0 +1,29 @@
+﻿commit 6350c1d8439300535bace129302ad69a3838e497
+Author: Joshika <carserviceguru@gmail.com>
+Date:   Wed Mar 25 23:51:54 2026 +0530
+
+    feat: show garage cancellation message on customer dashboard
+
+commit 914b560163f5593f970e69bf54aab8cf0adcf72c
+Author: Joshika <carserviceguru@gmail.com>
+Date:   Tue Mar 24 21:24:00 2026 +0530
+
+    feat: refine Job Card PDF header, dynamic workshop names, and database-driven data
+
+commit 99784a782651e102af6708a06fa74c3e787402ec
+Author: Joshika <carserviceguru@gmail.com>
+Date:   Tue Mar 24 20:20:28 2026 +0530
+
+    feat: refine Job Card PDF generation and update notification format
+
+commit 487ba5405dd39c15cd0f4fe6e954f1a855adcfcb
+Author: Joshika <carserviceguru@gmail.com>
+Date:   Mon Mar 23 19:28:14 2026 +0530
+
+    Update Job Card PDF to match professional 2-page design and add user registration defaults
+
+commit 9a874df8182b9c8d409023bda01d21a59b914a7a
+Author: Joshika <carserviceguru@gmail.com>
+Date:   Mon Mar 23 19:03:15 2026 +0530
+
+    Update service status labels and dashboard stepper

@@ -1,0 +1,65 @@
+﻿[dotenv@17.3.1] injecting env (4) from .env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+Result: {
+  "id": "c5d855ac-cc2c-46c7-930c-7df27744ff5f",
+  "user_id": "a345fa35-c766-4363-a20f-1de00b5bf6fa",
+  "vehicle_id": "f420a153-bc0c-474b-bf61-f7f90307b001",
+  "garage_id": null,
+  "status": "trashed",
+  "total_cost": 5733,
+  "scheduled_date": "2026-03-26",
+  "scheduled_time": "12:00 PM",
+  "created_at": "2026-03-22T09:01:10.593342+00:00",
+  "service_status": "Cancelled by Garage - Busy",
+  "odometer_reading": "12334",
+  "car_brand": "MAHINDRA",
+  "car_model": "XUV 700",
+  "manufacturing_year": "2013",
+  "gender": "Male",
+  "car_color": "Arctic White",
+  "car_variant": "Transmission",
+  "supervisor": "Nandhu",
+  "engine_no": "3435",
+  "chassis_no": "4354",
+  "tax_type": "GST",
+  "arrival_mode": "Walkin",
+  "fuel_status": "50%",
+  "battery_details": "Amaron",
+  "fuel_type": "Petrol",
+  "inventory": {
+    "perfume": true,
+    "jack_set": true,
+    "mud_flap": true,
+    "tool_kit": false,
+    "head_rest": true,
+    "wheel_cap": true,
+    "floor_mats": true,
+    "spare_wheel": true
+  },
+  "Registration_no": "",
+  "car_documents": [
+    {
+      "name": "SECOND HAND CAR INSPECTION",
+      "status": "Checked"
+    }
+  ],
+  "registration_no": "KA01AA9000",
+  "services": [
+    {
+      "id": "ca25ce0c-225d-4644-a3af-2c788b0ddc6c",
+      "icon": "Battery",
+      "name": "Battery Jumpstart / Inspection",
+      "color": "bg-primary",
+      "label": "QUICK FIX",
+      "price": 499,
+      "created_at": "2026-03-10T12:36:59.037124+00:00"
+    },
+    {
+      "name": "battery backup",
+      "price": 1234
+    },
+    {
+      "name": "Engine oil",
+      "price": 4000
+    }
+  ]
+}

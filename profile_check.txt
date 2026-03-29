@@ -1,0 +1,7 @@
+﻿[dotenv@17.3.1] injecting env (4) from .env -- tip: ≡ƒ¢í∩╕Å auth for agents: https://vestauth.com
+Profiles: [
+  {
+    "id": "a345fa35-c766-4363-a20f-1de00b5bf6fa",
+    "name": "Devibharathi "
+  }
+]

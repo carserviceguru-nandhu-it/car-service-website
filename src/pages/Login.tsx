@@ -128,7 +128,15 @@ export default function Login({ onLogin }: LoginProps) {
                 placeholder="+91 98765 43210"
                 className="w-full pl-12 pr-4 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  // Auto-prefix +91 for 10-digit Indian numbers
+                  const digits = val.replace(/\D/g, '');
+                  if (digits.length === 10 && !val.startsWith('+')) {
+                    val = `+91${digits}`;
+                  }
+                  setFormData({ ...formData, phone: val });
+                }}
               />
             </div>
           </div>

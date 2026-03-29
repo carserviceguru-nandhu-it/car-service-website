@@ -1,0 +1,27 @@
+﻿[dotenv@17.3.1] injecting env (4) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+Bookings: [
+  {
+    "id": "e147f202-21b8-4f69-ad1f-1b471dfefdd1",
+    "status": "trashed",
+    "service_status": "cancelled",
+    "vehicle_id": "a3d8232c-8087-47df-8506-c43509f7bd32"
+  },
+  {
+    "id": "c5d855ac-cc2c-46c7-930c-7df27744ff5f",
+    "status": "pending",
+    "service_status": "Cancelled by Garage - Busy",
+    "vehicle_id": "f420a153-bc0c-474b-bf61-f7f90307b001"
+  },
+  {
+    "id": "c35c422b-1f1b-4d33-9da5-711e88f27aca",
+    "status": "pending",
+    "service_status": "Assigned",
+    "vehicle_id": "d1f0800d-24e7-4b39-a604-1f7e47d6c763"
+  },
+  {
+    "id": "2d22e6fe-783b-4f52-b664-cc9a498d5975",
+    "status": "pending",
+    "service_status": "Assigned",
+    "vehicle_id": "f3d47e9a-4537-4fd9-b17e-1616c9408860"
+  }
+]
