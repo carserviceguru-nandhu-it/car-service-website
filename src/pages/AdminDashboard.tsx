@@ -147,6 +147,7 @@ export default function AdminDashboard() {
       case 'drop on the way': return <MapPin className="w-4 h-4 text-cyan-500" />;
       case 'delivered':
       case 'completed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      case 'money collected': return <CheckCircle2 className="w-4 h-4 text-teal-500" />;
       case 'cancelled': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return null;
     }
@@ -164,6 +165,7 @@ export default function AdminDashboard() {
       case 'drop on the way': return 'bg-cyan-100 text-cyan-600 border-cyan-200';
       case 'delivered':
       case 'completed': return 'bg-green-100 text-green-600 border-green-200';
+      case 'money collected': return 'bg-teal-100 text-teal-700 border-teal-200';
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200';
       default: return 'bg-stone-100 text-stone-600 border-stone-200';
     }
@@ -213,6 +215,7 @@ export default function AdminDashboard() {
                   <option value="Ready for Delivery">Ready for Delivery</option>
                   <option value="Drop on the way">Drop on the way</option>
                   <option value="Delivered">Delivered</option>
+                  <option value="Money Collected">Money Collected</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
@@ -308,6 +311,7 @@ export default function AdminDashboard() {
                         <option value="Ready for Delivery">Ready for Delivery</option>
                         <option value="Drop on the way">Drop on the way</option>
                         <option value="Delivered">Delivered</option>
+                        <option value="Money Collected">Money Collected</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </div>

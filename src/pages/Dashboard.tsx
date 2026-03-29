@@ -663,15 +663,45 @@ export default function Dashboard({ user }: DashboardProps) {
       console.warn('No invoice data found:', e);
     }
 
-    const services = booking.services || [];
+    // Combine services and extra services, avoiding duplicates
+    const baseServices = booking.services || [];
+    const extraServicesRaw = booking.invoice_extra_services || [];
+    let extraServices: any[] = [];
+    try {
+      if (Array.isArray(extraServicesRaw)) {
+        extraServices = extraServicesRaw;
+      } else if (typeof extraServicesRaw === 'string') {
+        const parsed = JSON.parse(extraServicesRaw);
+        extraServices = Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.warn("Failed to parse extra services:", e);
+    }
+
+    const combinedServices = [...baseServices];
+    extraServices.forEach((extra: any) => {
+      const extraName = typeof extra === 'object' ? extra.name : extra;
+      if (!combinedServices.some(s => (typeof s === 'object' ? s.name : s) === extraName)) {
+        combinedServices.push(typeof extra === 'object' ? extra : { name: String(extra), price: 0 });
+      }
+    });
+
+    const services = combinedServices;
     const orderValue = booking.total_price || 0;
-    const discount = invoiceData?.discount || 0;
-    const discountType = invoiceData?.discount_type || 'fixed';
-    const discountAmt = discountType === 'percent' ? Math.round(orderValue * discount / 100) : discount;
-    const discountLabel = invoiceData?.discount_label || (discountAmt > 0 ? 'Discount' : '');
-    const tax = invoiceData?.tax || 0;
-    const grandTotal = invoiceData?.grand_total || (orderValue - discountAmt + tax) || orderValue;
-    const remarks = invoiceData?.remarks || booking.notes || booking.additional_notes || '';
+    
+    // Preference: booking table columns -> invoiceData -> fallback 0
+    const discountAmt = booking.invoice_discount !== null && booking.invoice_discount !== undefined 
+      ? Number(booking.invoice_discount) 
+      : (invoiceData?.discount_amt || 0);
+      
+    const safetyFees = booking.invoice_safety_fees !== null && booking.invoice_safety_fees !== undefined 
+      ? Number(booking.invoice_safety_fees) 
+      : (invoiceData?.tax || 0);
+
+    const grandTotal = (orderValue - discountAmt + safetyFees);
+    const mainRemarks = booking.invoice_remarks || '';
+    const discountRemarks = booking.invoice_discount_remarks || '';
+    
     const deliveryDate = booking.scheduled_date || booking.delivery_date || (booking.booking_time ? new Date(booking.booking_time).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'));
     const regNo = booking.registration_no || booking.reg_no || booking.vehicle_reg || '';
     const odometer = booking.odometer_reading || booking.odometer || '';
@@ -862,52 +892,56 @@ export default function Dashboard({ user }: DashboardProps) {
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(50, 50, 50);
-    doc.text(discountAmt > 0 ? `Discount (${discountType === 'percent' ? discount + '%' : 'fixed'})` : 'Discount', col1X + 3, yPos + 6);
+    doc.text('Discount', col1X + 3, yPos + 6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(220, 50, 50);
     doc.text(discountAmt > 0 ? `- Rs. ${discountAmt}` : 'Rs. 0', col1X + 40, yPos + 6);
-    // Right cell with loyalty label
+    // Right cell with discount remarks
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    if (discountLabel) doc.text(discountLabel, col1X + 99, yPos + 6);
+    if (discountRemarks) {
+      const splitDiscountRemarks = doc.splitTextToSize(String(discountRemarks), 90);
+      doc.text(splitDiscountRemarks[0] || '', col1X + 99, yPos + 6);
+    }
     yPos += 9;
 
-    // Tax row
+    // Safety Fees row (formerly Tax)
     doc.setDrawColor(200, 200, 200);
     doc.rect(col1X, yPos, 96, 9);
     doc.rect(col1X + 96, yPos, 96, 9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(50, 50, 50);
-    doc.text('Tax', col1X + 3, yPos + 6);
+    doc.text('Safety Fees', col1X + 3, yPos + 6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.text(`Rs. ${tax}`, col1X + 40, yPos + 6);
+    doc.text(`Rs. ${safetyFees}`, col1X + 40, yPos + 6);
     yPos += 9;
 
-    // Grand Total row
+    // Grand Total row - Larger and Bold
     doc.setFillColor(245, 247, 255);
-    doc.rect(col1X, yPos, 96, 9, 'FD');
-    doc.rect(col1X + 96, yPos, 96, 9, 'FD');
+    doc.rect(col1X, yPos, 96, 12, 'FD');
+    doc.rect(col1X + 96, yPos, 96, 12, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(11);
     doc.setTextColor(20, 20, 20);
-    doc.text('Grand Total', col1X + 3, yPos + 6.5);
+    doc.text('Grand Total', col1X + 3, yPos + 8);
+    doc.setFontSize(12);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text(`Rs. ${grandTotal}`, col1X + 40, yPos + 6.5);
-    yPos += 12;
+    doc.text(`Rs. ${grandTotal}`, col1X + 42, yPos + 8);
+    yPos += 16;
 
-    // Additional Notes
-    if (remarks) {
+    // Additional Remarks (from mainRemarks)
+    if (mainRemarks) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(50, 50, 50);
-      doc.text('Additional Notes', col1X, yPos);
+      doc.text('Remarks', col1X, yPos);
       yPos += 6;
       doc.setDrawColor(200, 200, 200);
       doc.rect(col1X, yPos, 192, 20);
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
-      const notesSplit = doc.splitTextToSize(remarks, 185);
+      const notesSplit = doc.splitTextToSize(mainRemarks, 185);
       doc.text(notesSplit, col1X + 3, yPos + 6);
     }
 
@@ -929,12 +963,12 @@ export default function Dashboard({ user }: DashboardProps) {
     doc.setFont('helvetica', 'normal');
 
     const disclaimerItems = [
-      { text: 'Prices are inclusive of all applicable taxes', color: [50, 50, 50] as [number, number, number] },
-      { text: 'This is a summary of the order placed on Car Service Guru and not a tax Invoice.', color: [37, 99, 235] as [number, number, number] },
-      { text: '  The Tax invoice shall be provided by the workshop directly.', color: [37, 99, 235] as [number, number, number] },
-      { text: 'Colour of Engine Oil might turn black post service in Diesel Cars.', color: [220, 120, 20] as [number, number, number] },
-      { text: 'Safety & Warranty Fees covers Skill India Training, Pickup & Drop Warranty', color: [220, 120, 20] as [number, number, number] },
-      { text: '  & Upskilling of Workshop Partners', color: [220, 120, 20] as [number, number, number] },
+      { text: 'Prices are inclusive of all applicable taxes', color: [0, 0, 0] as [number, number, number] },
+      { text: 'This is a summary of the order placed on Car Service Guru and not a tax Invoice.', color: [0, 0, 0] as [number, number, number] },
+      { text: '  The Tax invoice shall be provided by the workshop directly.', color: [0, 0, 0] as [number, number, number] },
+      { text: 'Colour of Engine Oil might turn black post service in Diesel Cars.', color: [0, 0, 0] as [number, number, number] },
+      { text: 'Safety & Warranty Fees covers Skill India Training, Pickup & Drop Warranty', color: [0, 0, 0] as [number, number, number] },
+      { text: '  & Upskilling of Workshop Partners', color: [0, 0, 0] as [number, number, number] },
     ];
 
     disclaimerItems.forEach(item => {
@@ -944,28 +978,6 @@ export default function Dashboard({ user }: DashboardProps) {
       const split = doc.splitTextToSize(fullText, 180);
       doc.text(split, 15, yPos);
       yPos += split.length * 7 + 2;
-    });
-
-    yPos += 15;
-
-    // Full terms
-    doc.setFontSize(9);
-    doc.setTextColor(60, 60, 60);
-    const fullTerms = [
-      '• Pickup and Drop time is subject to the availability of drivers.',
-      '• Payment should be made in full during the time of vehicle delivery.',
-      '• Inventory discrepancies will not be entertained once confirmed by owner at time of delivery.',
-      '• Car Service Guru will not be liable for any delay due to conditions beyond control.',
-      '• Garaging cost (500/day) will be levied if: a) Approval not provided within 7 days for insurance jobs b) Approval not provided within 3 days for other jobs c) Car not picked up within 7 days of completion.',
-      '• Fuel consumed during vehicle transport will be borne by the customer.',
-      '• All personal belongings should be removed. We are not responsible for any loss.',
-      '• Bodywork/Painting vehicles dispatched only after successful payment and inspection.',
-    ];
-
-    fullTerms.forEach(term => {
-      const split = doc.splitTextToSize(term, 180);
-      doc.text(split, 15, yPos);
-      yPos += split.length * 6 + 4;
     });
 
     const customerNameSlug2 = cName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '') || 'Customer';
@@ -1065,10 +1077,11 @@ export default function Dashboard({ user }: DashboardProps) {
             <div className="space-y-6">
               {bookings.map((booking, idx) => {
                 const isGarageCancelled = booking.service_status?.toLowerCase().includes('cancelled');
+                const isMoneyCollected = (booking.service_status || '').toLowerCase().includes('money collected');
                 const finalDisplayStatus = isGarageCancelled ? booking.service_status : (booking.display_status || booking.status || 'pending');
                 const currentStep = getStatusStep(finalDisplayStatus);
                 const isExpanded = expandedId === booking.id;
-                const canCancel = !isGarageCancelled && !booking.garage_id && booking.status !== 'completed' && !booking.status.includes('cancelled');
+                const canCancel = !isGarageCancelled && !isMoneyCollected && !booking.garage_id && booking.status !== 'completed' && !booking.status.includes('cancelled');
 
                 return (
                   <motion.div 
@@ -1122,14 +1135,35 @@ export default function Dashboard({ user }: DashboardProps) {
                         </div>
                         <div className="flex flex-col items-end justify-between gap-4">
                           <div className="flex flex-wrap gap-2 justify-end">
-                            {(booking.services || []).map((s: any, i: number) => {
-                              const sName = typeof s === 'object' ? s.name : s;
-                              return (
-                                <span key={i} className="bg-blue-50 px-3 py-1 rounded-lg text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">
-                                  {(sName || "").replace('-', ' ')}
-                                </span>
-                              );
-                            })}
+                            {(() => {
+                              const baseServices = booking.services || [];
+                              const extraRaw = booking.invoice_extra_services || [];
+                              let extraServices: any[] = [];
+                              try {
+                                if (Array.isArray(extraRaw)) extraServices = extraRaw;
+                                else if (typeof extraRaw === 'string') {
+                                  const p = JSON.parse(extraRaw);
+                                  extraServices = Array.isArray(p) ? p : [];
+                                }
+                              } catch(e) {}
+                              
+                              const combined = [...baseServices];
+                              extraServices.forEach((extra: any) => {
+                                const extraName = typeof extra === 'object' ? extra.name : extra;
+                                if (!combined.some(s => (typeof s === 'object' ? s.name : s) === extraName)) {
+                                  combined.push(typeof extra === 'object' ? extra : { name: String(extra) });
+                                }
+                              });
+                              
+                              return combined.map((s: any, i: number) => {
+                                const sName = typeof s === 'object' ? s.name : s;
+                                return (
+                                  <span key={i} className="bg-blue-50 px-3 py-1 rounded-lg text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">
+                                    {(sName || "").replace('-', ' ')}
+                                  </span>
+                                );
+                              });
+                            })()}
                           </div>
                           <div className="flex items-center gap-3">
                             <button 
@@ -1191,6 +1225,48 @@ export default function Dashboard({ user }: DashboardProps) {
                                 })}
                               </div>
                             </div>
+
+                            {/* Money Collected Thank You Banner */}
+                            {isMoneyCollected && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                transition={{ duration: 0.5, ease: 'easeOut' }}
+                                className="relative mb-8 overflow-hidden rounded-2xl p-[2px]"
+                                style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a, #15803d, #22d3ee, #3b82f6, #a855f7)' }}
+                              >
+                                <div className="relative bg-white rounded-[14px] p-6 text-center overflow-hidden">
+                                  {/* Shimmer glow behind */}
+                                  <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-white to-blue-50 pointer-events-none" />
+                                  {/* Sparkle circles */}
+                                  <div className="absolute -top-4 -left-4 w-20 h-20 bg-green-400/20 rounded-full blur-2xl" />
+                                  <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-blue-400/20 rounded-full blur-2xl" />
+                                  <div className="relative z-10">
+                                    <div className="flex justify-center mb-3">
+                                      <span className="text-4xl animate-bounce">🎉</span>
+                                    </div>
+                                    <p
+                                      className="text-2xl font-black mb-1 tracking-tight"
+                                      style={{ background: 'linear-gradient(135deg, #15803d, #16a34a, #0ea5e9, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
+                                    >
+                                      ✅ Delivered &amp; Money Collected!
+                                    </p>
+                                    <p className="text-base font-bold text-stone-600 mt-2">
+                                      Thank you for choosing{' '}
+                                      <span className="font-black" style={{ background: 'linear-gradient(90deg, #2563eb, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Car Service Guru</span>!
+                                    </p>
+                                    <p className="text-sm font-medium text-stone-500 mt-1">
+                                      Your car has been delivered and payment has been received. 🚗✨
+                                    </p>
+                                    <div className="flex justify-center gap-2 mt-4 flex-wrap">
+                                      <span className="px-3 py-1 rounded-full text-xs font-black bg-green-100 text-green-700 border border-green-200">🟢 Service Complete</span>
+                                      <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-700 border border-blue-200">💰 Payment Received</span>
+                                      <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-700 border border-purple-200">⭐ Thanks for Booking!</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
 
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                               <div className="flex items-center gap-4">
